@@ -39,9 +39,12 @@ class BlogFormatter:
         # Extract image references from original content for validation
         original_images = self._extract_image_references(content_with_images)
         
+        # Enhance image context before formatting
+        enhanced_content = self._enhance_image_context(content_with_images, frame_data)
+        
         # Pass 2: Format as blog post with structure
         logger.info("Formatting content as blog post with Claude API...")
-        formatted_content = self._format_as_blog_post(content_with_images, title)
+        formatted_content = self._format_as_blog_post(enhanced_content, title)
         
         # Validate that images are reasonably preserved (allow for minor differences)
         formatted_images = self._extract_image_references(formatted_content)
@@ -104,40 +107,60 @@ CRITICAL PRESERVATION REQUIREMENTS:
 4. **PRESERVE TECHNICAL DETAILS**: Keep all technical information, examples, and explanations
 
 MANDATORY BLOG STRUCTURE REQUIREMENTS:
-- **MUST start with a brief introduction** (2-3 sentences explaining what the post covers)
-- **MUST add meaningful section headers** using ## and ### to break up content logically
-- **MUST improve paragraph breaks** - no walls of text
-- **MUST add smooth transitions** between sections
-- **MUST rewrite transcript language** to be more engaging and blog-appropriate (NOT transcript-like)
-- **MUST add a conclusion** that summarizes key takeaways
+- **MUST start with a compelling introduction** (2-3 sentences that hook the reader and explain what they'll learn)
+- **MUST add clear section headers** using ## for main topics and ### for subtopics
+- **MUST break up long paragraphs** - aim for 3-4 sentences per paragraph maximum
+- **MUST add smooth transitions** between sections to improve flow
+- **MUST transform transcript language** to be more engaging and written-style (remove "so", "right", "now", filler words)
+- **MUST add a strong conclusion** that summarizes key takeaways and next steps
+
+SPECIFIC STRUCTURAL IMPROVEMENTS:
+- Transform "Right, so you want to know..." into "Building a reliable ZigBee network requires..."
+- Convert "Let's talk about..." into proper section headers like "## Channel Selection Strategy"
+- Break up walls of text into digestible paragraphs
+- Add logical section breaks where topics change
+- Improve sentence flow and remove conversational speech patterns
+- Add context around images to make them more relevant
+
+SUGGESTED SECTION STRUCTURE (adapt as needed):
+## Introduction
+## Choosing the Right Coordinator
+## Strategic Device Placement
+## Channel Selection and Interference
+## Understanding Network Types: Routers vs End Devices
+## Building an Effective Mesh Network
+## Advanced Troubleshooting with Log Analysis
+## Conclusion and Best Practices
 
 FORMATTING IMPROVEMENTS (while preserving everything above):
-- Transform conversational/spoken language into written blog style
-- Fix sentence structure to be more polished than raw speech
-- Add proper paragraph organization
-- Create logical content flow with clear sections
+- Transform conversational/spoken language into polished written style
+- Remove transcript artifacts like "you can see here", "as the video goes on"
+- Fix sentence structure to be more engaging than raw speech
+- Add proper paragraph organization with clear topic sentences
+- Create logical content flow with seamless transitions
 
-EXAMPLE of what to preserve:
-If you see: "Here's how to configure the settings. ![Screenshot of settings](frame_120.0s.jpg) As you can see in this interface..."
-Keep it as: "Here's how to configure the settings. ![Screenshot of settings](frame_120.0s.jpg) As you can see in this interface..."
+EXAMPLE TRANSFORMATION:
+BEFORE: "Right, so you want to know how to build a proper ZigBee network that actually works reliably, or maybe you're doing battle with your current existing mesh network."
+AFTER: "## Introduction\n\nBuilding a reliable ZigBee network can be challenging, whether you're starting from scratch or troubleshooting an existing mesh setup."
 
 WHAT NOT TO DO:
 - Do not move images to different locations
-- Do not remove any images
-- Do not change image filenames or alt text
-- Do not remove any content or information
-- Do not summarize or condense the content
+- Do not remove any images or change their filenames
+- Do not remove any technical content or information
+- Do not summarize or condense explanations
+- Do not change the meaning or lose any details
 
-Your goal is to make the content more readable and structured while keeping 100% of the original information and all images exactly where they are.
+Your goal is to transform transcript-style content into engaging blog format while preserving every detail and image.
 
 VERIFICATION CHECKLIST before returning:
 ✓ All ![...](filename.jpg) references are present and unchanged
 ✓ Images remain in their original positions relative to text
-✓ No content has been removed or significantly shortened
-✓ All technical details and examples are preserved
-✓ All explanations and context around images are kept
+✓ All technical content and examples are preserved
+✓ Content is broken into clear, logical sections with headers
+✓ Paragraphs are properly sized (3-4 sentences max)
+✓ Conversational language is transformed to written style
 
-Return the complete formatted blog post content (no front matter). The output should be longer or similar length to the input, never significantly shorter."""
+Return the complete formatted blog post content (no front matter). The output should be similar or longer in length, never significantly shorter."""
     
     def apply_template(
         self, 
@@ -280,6 +303,38 @@ Return only the cleaned transcript text:
             cleaned_segments.append(cleaned_segment)
         
         return cleaned_segments
+    
+    def _enhance_image_context(self, content: str, frame_data: List[Dict]) -> str:
+        """Enhance image alt text and context based on frame data."""
+        import re
+        
+        # Create a mapping of timestamps to frame descriptions
+        frame_map = {}
+        for frame in frame_data:
+            timestamp = frame.get('timestamp', 0)
+            description = frame.get('description', '')
+            frame_map[timestamp] = description
+        
+        # Find and enhance image references
+        def enhance_image_reference(match):
+            full_match = match.group(0)
+            # Extract timestamp from filename (e.g., frame_15.0s_optimized.jpg -> 15.0)
+            timestamp_match = re.search(r'frame_(\d+(?:\.\d+)?)s', full_match)
+            if timestamp_match:
+                timestamp = float(timestamp_match.group(1))
+                if timestamp in frame_map and frame_map[timestamp]:
+                    # Use the AI-generated description as alt text
+                    description = frame_map[timestamp]
+                    # Update alt text in the image reference
+                    enhanced = re.sub(r'!\[.*?\]', f'![{description}]', full_match)
+                    return enhanced
+            return full_match
+        
+        # Apply enhancements to all image references
+        image_pattern = r'!\[.*?\]\([^)]+\)'
+        enhanced_content = re.sub(image_pattern, enhance_image_reference, content)
+        
+        return enhanced_content
     
     def _extract_image_references(self, content: str) -> List[str]:
         """Extract all image references from content."""

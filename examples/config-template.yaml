@@ -11,7 +11,7 @@ image_settings:
 
 transcript_settings:
   context_window: 30           # Seconds of context around frames
-  whisper_model: "small"       # Whisper model: tiny, base, small, medium, large
+  whisper_model: "base"        # Whisper model: tiny, base, small, medium, large
   claude_model: "claude-3-haiku-20240307"  # Claude model for cleanup
   claude_api_key: ""           # Or set ANTHROPIC_API_KEY env var
 

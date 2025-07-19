@@ -175,7 +175,7 @@ def cli():
 @click.option('--title', help='Blog post title (auto-generated if not provided)')
 @click.option('--config', '-c', help='Path to configuration file')
 @click.option('--claude-api-key', help='Claude API key for transcript cleanup (or set ANTHROPIC_API_KEY env var)')
-@click.option('--whisper-model', default='small', help='Whisper model size (tiny, base, small, medium, large)')
+@click.option('--whisper-model', default='base', help='Whisper model size (tiny, base, small, medium, large)')
 @click.option('--save-transcript', is_flag=True, help='Save extracted transcript to .srt file')
 @click.option('--template', help='Path to blog post template file with {{placeholders}}')
 @click.option('--front-matter', help='Path to JSON file with additional front matter data')

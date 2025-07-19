@@ -23,7 +23,7 @@ class Config:
     
     # Transcript settings
     CONTEXT_WINDOW = 30  # seconds before/after frame for transcript context
-    WHISPER_MODEL = "small"  # tiny, base, small, medium, large
+    WHISPER_MODEL = "base"  # tiny, base, small, medium, large
     CLAUDE_MODEL = "claude-3-haiku-20240307"
     
     # Output settings
