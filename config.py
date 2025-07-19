@@ -7,9 +7,9 @@ class Config:
     """Configuration class for video processing and Hugo generation."""
     
     # Video processing settings
-    FRAME_SAMPLE_INTERVAL = 15  # seconds
-    MIN_FACE_RATIO = 0.4  # Skip frames where face > 40% of screen
-    MAX_FACE_RATIO = 0.2  # Prefer frames where face < 20% of screen
+    FRAME_SAMPLE_INTERVAL = 20  # seconds (increased for better selection)
+    MIN_FACE_RATIO = 0.15  # Skip frames where face > 15% of screen (more strict)
+    MAX_FACE_RATIO = 0.05  # Prefer frames where face < 5% of screen  
     FACE_DETECTION_CONFIDENCE = 0.5
     
     # Image settings

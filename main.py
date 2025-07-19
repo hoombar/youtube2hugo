@@ -46,15 +46,7 @@ class YouTube2Hugo:
         temp_dir = os.path.join(os.path.dirname(output_path), 'temp_frames')
         
         try:
-            # Extract and analyze video frames
-            logger.info("Extracting video frames...")
-            frame_data = self.video_processor.extract_frames(video_path, temp_dir)
-            
-            # Optimize images
-            logger.info("Optimizing images...")
-            optimized_frames = self.video_processor.optimize_images(frame_data)
-            
-            # Get transcript (extract or parse existing)
+            # Get transcript first (needed for intelligent frame selection)
             if transcript_path and os.path.exists(transcript_path):
                 logger.info(f"Using existing transcript: {transcript_path}")
                 transcript_segments = self.transcript_parser.parse_transcript(transcript_path)
@@ -68,6 +60,14 @@ class YouTube2Hugo:
                     self.transcript_extractor.save_transcript(
                         transcript_segments, transcript_output, 'srt'
                     )
+            
+            # Extract and analyze video frames using transcript context
+            logger.info("Extracting video frames with content-aware selection...")
+            frame_data = self.video_processor.extract_frames(video_path, temp_dir, transcript_segments)
+            
+            # Optimize images
+            logger.info("Optimizing images...")
+            optimized_frames = self.video_processor.optimize_images(frame_data)
             
             # Generate blog post title if not provided
             if not title:

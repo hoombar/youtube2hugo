@@ -173,15 +173,34 @@ class HugoGenerator:
             paragraph_text = self._format_paragraph_text(paragraph)
             content_parts.append(paragraph_text)
             
-            # Find best frame for this paragraph
-            best_frame = self._find_best_frame_for_paragraph(
+            # Find all relevant frames for this paragraph (including clustered ones)
+            relevant_frames = self._find_relevant_frames_for_paragraph(
                 paragraph, sorted_frames, used_frames
             )
             
-            if best_frame:
-                image_markdown = self._generate_image_markdown(best_frame, paragraph)
-                content_parts.append(image_markdown)
-                used_frames.add(best_frame['timestamp'])
+            if relevant_frames:
+                # Group clustered images together
+                clustered_images = []
+                regular_images = []
+                
+                for frame in relevant_frames:
+                    if frame.get('is_clustered', False):
+                        clustered_images.append(frame)
+                    else:
+                        regular_images.append(frame)
+                
+                # Add regular images
+                for frame in regular_images:
+                    image_markdown = self._generate_image_markdown(frame, paragraph)
+                    content_parts.append(image_markdown)
+                    used_frames.add(frame['timestamp'])
+                
+                # Add clustered images as a group
+                if clustered_images:
+                    clustered_markdown = self._generate_clustered_images_markdown(clustered_images, paragraph)
+                    content_parts.append(clustered_markdown)
+                    for frame in clustered_images:
+                        used_frames.add(frame['timestamp'])
         
         return '\n\n'.join(content_parts)
     
@@ -260,6 +279,66 @@ class HugoGenerator:
         best_frame = min(candidate_frames, key=lambda x: x['face_ratio'])
         return best_frame
     
+    def _find_relevant_frames_for_paragraph(self, paragraph: List[Dict], sorted_frames: List[Dict], used_frames: set) -> List[Dict]:
+        """Find all relevant frames for a paragraph, including clustered ones."""
+        paragraph_start = paragraph[0]['start_time']
+        paragraph_end = paragraph[-1]['end_time']
+        
+        # Find frames that overlap with this paragraph timeframe
+        candidate_frames = []
+        for frame in sorted_frames:
+            if frame['timestamp'] in used_frames:
+                continue
+                
+            # Include frames within the paragraph timeframe
+            if paragraph_start <= frame['timestamp'] <= paragraph_end:
+                candidate_frames.append(frame)
+            # Also include frames slightly before/after (context)
+            elif abs(frame['timestamp'] - paragraph_start) <= 10 or abs(frame['timestamp'] - paragraph_end) <= 10:
+                candidate_frames.append(frame)
+        
+        if not candidate_frames:
+            return []
+        
+        # For clustered images, return up to 3 from the same time window
+        # For regular images, return the best one
+        clustered_frames = [f for f in candidate_frames if f.get('is_clustered', False)]
+        regular_frames = [f for f in candidate_frames if not f.get('is_clustered', False)]
+        
+        result = []
+        
+        # Add best regular frame
+        if regular_frames:
+            best_regular = min(regular_frames, key=lambda x: x['face_ratio'])
+            result.append(best_regular)
+        
+        # Add clustered frames (up to 3)
+        if clustered_frames:
+            # Sort by score and take best 3
+            clustered_frames.sort(key=lambda x: x['score'], reverse=True)
+            result.extend(clustered_frames[:3])
+        
+        return result
+    
+    def _generate_clustered_images_markdown(self, frames: List[Dict], paragraph: List[Dict]) -> str:
+        """Generate markdown for clustered images displayed side by side."""
+        image_tags = []
+        
+        for frame in frames:
+            alt_text = self._generate_alt_text(frame, paragraph)
+            image_path = self._get_hugo_image_path(frame)
+            
+            if self.config.get('use_hugo_shortcodes', False):
+                image_tags.append(f'{{{{< figure src="{image_path}" alt="{alt_text}" width="300" class="inline" >}}}}')
+            else:
+                image_tags.append(f'<img src="{image_path}" alt="{alt_text}" width="300" style="display: inline-block; margin: 5px;">')
+        
+        # Wrap in a container div for better layout
+        if self.config.get('use_hugo_shortcodes', False):
+            return '\n'.join(image_tags)
+        else:
+            return f'<div class="image-cluster">\n{"".join(image_tags)}\n</div>'
+    
     def _generate_image_markdown(self, frame: Dict, paragraph: List[Dict]) -> str:
         """Generate markdown for an image with appropriate alt text."""
         
@@ -269,11 +348,20 @@ class HugoGenerator:
         # Get relative path for Hugo
         image_path = self._get_hugo_image_path(frame)
         
+        # Check if this is a clustered image (from jump cuts/rapid content)
+        is_clustered = frame.get('is_clustered', False)
+        
         # Generate markdown with Hugo shortcode or standard markdown
         if self.config.get('use_hugo_shortcodes', False):
-            return f'{{{{< figure src="{image_path}" alt="{alt_text}" >}}}}'
+            if is_clustered:
+                return f'{{{{< figure src="{image_path}" alt="{alt_text}" width="400" class="inline" >}}}}'
+            else:
+                return f'{{{{< figure src="{image_path}" alt="{alt_text}" >}}}}'
         else:
-            return f'![{alt_text}]({image_path})'
+            if is_clustered:
+                return f'<img src="{image_path}" alt="{alt_text}" width="400" style="display: inline-block; margin: 5px;">'
+            else:
+                return f'![{alt_text}]({image_path})'
     
     def _generate_alt_text(self, frame: Dict, paragraph: List[Dict]) -> str:
         """Generate descriptive alt text for an image."""
