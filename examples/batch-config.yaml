@@ -2,7 +2,7 @@ settings:
   frame_sample_interval: 20
   min_face_ratio: 0.35
   image_quality: 90
-  whisper_model: "base"
+  whisper_model: "small"
   claude_api_key: "your-claude-api-key"  # Or set ANTHROPIC_API_KEY env var
 
 videos:

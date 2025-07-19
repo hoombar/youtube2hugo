@@ -5,11 +5,15 @@ A Python application that intelligently converts YouTube videos into Hugo blog p
 ## Features
 
 - **Automatic Transcript Extraction**: Uses OpenAI Whisper to extract transcripts directly from video
-- **AI-Powered Transcript Cleanup**: Uses Claude API to fix speech recognition errors and typos
+- **Two-Pass AI Enhancement**: 
+  - **Pass 1**: Claude API cleans up transcription errors and typos
+  - **Pass 2**: Claude API transforms transcript into engaging blog post with headers and structure
 - **Smart Frame Analysis**: Uses computer vision to identify frames containing visual aids (not talking head shots)  
 - **Multi-format Support**: Handles existing SRT, VTT, and plain text transcripts or extracts new ones
 - **Intelligent Image Placement**: Only extracts frames where visual content is prominent
+- **Template System**: Use custom templates with placeholders ({{title}}, {{content}}, {{date}}, etc.)
 - **Hugo Integration**: Generates properly formatted Hugo markdown with front matter
+- **Page Bundle Structure**: Creates self-contained post folders with relative image paths
 - **Configurable Processing**: Adjustable thresholds for face detection and frame selection
 - **Batch Processing**: Handle multiple videos at once
 - **CLI Interface**: Easy-to-use command-line interface
@@ -49,7 +53,7 @@ Convert a video with automatic transcript extraction:
 python main.py convert --video video.mp4 --output blog-post.md
 ```
 
-### With Claude API for transcript cleanup:
+### With Claude API for enhanced blog posts:
 
 ```bash
 export ANTHROPIC_API_KEY="your-claude-api-key"
@@ -57,6 +61,7 @@ python main.py convert \
   --video presentation.mp4 \
   --output content/posts/my-presentation \
   --title "My Amazing Presentation" \
+  --template examples/templates/tech-blog-template.md \
   --save-transcript
 ```
 
@@ -102,7 +107,7 @@ hugo_settings:
 
 transcript_settings:
   context_window: 30           # Seconds of context around frames
-  whisper_model: "base"        # Whisper model: tiny, base, small, medium, large
+  whisper_model: "small"       # Whisper model: tiny, base, small, medium, large
   claude_model: "claude-3-haiku-20240307"  # Claude model for cleanup
   claude_api_key: "your-key"   # Or set ANTHROPIC_API_KEY env var
 
@@ -118,7 +123,7 @@ front_matter_defaults:
 settings:
   frame_sample_interval: 20
   min_face_ratio: 0.35
-  whisper_model: "base"
+  whisper_model: "small"
   claude_api_key: "your-claude-api-key"
 
 videos:
@@ -153,13 +158,15 @@ The application uses MediaPipe for face detection to analyze video frames:
   - Face occupies <20% of screen (visual aids with presenter in corner)
   - Skips frames where face occupies >40% (talking head shots)
 
-### 2. Transcript Processing
+### 2. Transcript Processing & Enhancement
 
 - **Automatic extraction** using OpenAI Whisper (multiple model sizes available)
-- **AI cleanup** with Claude API to fix speech recognition errors
+- **Two-pass AI enhancement** with Claude API:
+  - **Pass 1**: Fix speech recognition errors, typos, and clean up transcription artifacts
+  - **Pass 2**: Transform into engaging blog post with proper headers, sections, and structure
 - **Multi-format support**: SRT, VTT, and plain text with timestamps
 - Matches extracted frame timestamps to nearby transcript segments
-- Inserts images at natural paragraph breaks in the text
+- Preserves image placement while restructuring content
 
 ### 3. Hugo Output
 
@@ -202,6 +209,57 @@ Welcome to this presentation on machine learning fundamentals.
 Let's explore the key concepts that drive modern AI systems...
 ```
 
+## Template System
+
+The tool supports custom templates with placeholder variables for flexible blog post formatting.
+
+### Available Templates
+
+- **Basic Template**: `examples/templates/basic-template.md` - Simple front matter + content
+- **Tech Blog**: `examples/templates/tech-blog-template.md` - Technology-focused with TOC and summary
+- **Tutorial**: `examples/templates/tutorial-template.md` - Step-by-step tutorial format
+- **Minimal**: `examples/templates/minimal-template.md` - Bare minimum structure
+
+### Template Placeholders
+
+- `{{title}}` - Blog post title
+- `{{date}}` - Publication date (ISO format)
+- `{{content}}` - Main blog content (formatted by Claude)
+- `{{description}}` - Post description
+- `{{author}}` - Author name
+- `{{tags}}` - Comma-separated tags
+- Custom variables from `--front-matter` JSON file
+
+### Example Template
+
+```markdown
+---
+title: "{{title}}"
+date: {{date}}
+author: "{{author}}"
+tags: ["tutorial", "{{category}}"]
+---
+
+# {{title}}
+
+*Generated from video content*
+
+{{content}}
+
+---
+*Published: {{date}}*
+```
+
+### Using Templates
+
+```bash
+python main.py convert \
+  --video video.mp4 \
+  --output content/posts/my-post \
+  --template examples/templates/tech-blog-template.md \
+  --front-matter custom-vars.json
+```
+
 ## Project File Structure
 
 ```
@@ -210,14 +268,61 @@ youtube2hugo/
 ├── video_processor.py      # Video analysis and frame extraction
 ├── transcript_extractor.py # Automatic transcript extraction with Whisper + Claude
 ├── transcript_parser.py    # Existing transcript file processing
-├── hugo_generator.py       # Hugo markdown generation
+├── blog_formatter.py       # Two-pass Claude AI content enhancement
+├── hugo_generator.py       # Hugo markdown generation with template support
 ├── config.py              # Configuration management
 ├── requirements.txt        # Python dependencies
 ├── README.md              # This file
 └── examples/              # Example files
     ├── sample-transcript.srt
     ├── config-template.yaml
-    └── batch-config.yaml
+    ├── batch-config.yaml
+    └── templates/         # Blog post templates
+        ├── basic-template.md
+        ├── tech-blog-template.md
+        ├── tutorial-template.md
+        └── minimal-template.md
+```
+
+## Two-Pass AI Enhancement
+
+When a Claude API key is provided, the tool performs two passes of AI enhancement:
+
+### Pass 1: Transcript Cleanup
+- Fixes speech recognition errors and typos
+- Removes filler words ("um", "uh", repeated phrases)
+- Corrects grammar and punctuation
+- Maintains original meaning and conversational flow
+
+### Pass 2: Blog Post Formatting
+- Transforms transcript into engaging blog post
+- Adds proper headers and section structure
+- Improves readability and flow
+- **Preserves all image placements** from the original transcript timing
+- Creates introduction and conclusion sections
+- Adds smooth transitions between topics
+
+### Example Transformation
+
+**Before (raw transcript):**
+```
+Um, so today we're going to talk about, uh, machine learning and, you know, how it works. So basically machine learning is, is when computers learn patterns from data...
+```
+
+**After Pass 1 (cleaned):**
+```
+Today we're going to talk about machine learning and how it works. Machine learning is when computers learn patterns from data...
+```
+
+**After Pass 2 (formatted):**
+```
+# Introduction to Machine Learning
+
+Welcome to this comprehensive guide on machine learning fundamentals.
+
+## What is Machine Learning?
+
+Machine learning is the process by which computers learn patterns from data...
 ```
 
 ## Advanced Usage

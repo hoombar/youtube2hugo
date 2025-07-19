@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import List, Dict, Optional
 import yaml
 import logging
+from blog_formatter import BlogFormatter
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -15,6 +16,7 @@ class HugoGenerator:
     
     def __init__(self, config: Dict):
         self.config = config
+        self.blog_formatter = BlogFormatter(config)
     
     def generate_blog_post(
         self, 
@@ -23,7 +25,8 @@ class HugoGenerator:
         frame_data: List[Dict],
         video_info: Dict,
         output_path: str,
-        front_matter_data: Optional[Dict] = None
+        front_matter_data: Optional[Dict] = None,
+        template_path: Optional[str] = None
     ) -> str:
         """Generate a complete Hugo blog post with front matter and content in page bundle format."""
         
@@ -39,21 +42,44 @@ class HugoGenerator:
         )
         
         # Generate content with smart image placement (using relative paths)
-        content = self._generate_content_with_images(
+        raw_content = self._generate_content_with_images(
             transcript_segments, frame_data, bundle_dir
         )
         
-        # Combine front matter and content
-        blog_post = f"---\n{front_matter}\n---\n\n{content}"
+        # Second pass: Format content as blog post with Claude
+        formatted_content = self.blog_formatter.format_content_with_images(
+            raw_content, title, frame_data
+        )
+        
+        # Apply template if provided
+        if template_path:
+            template_variables = {
+                'title': title,
+                'date': datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'),
+                'content': formatted_content
+            }
+            # Add custom front matter variables
+            if front_matter_data:
+                template_variables.update(front_matter_data)
+            
+            final_content = self.blog_formatter.apply_template(
+                formatted_content, template_path, template_variables
+            )
+        else:
+            # Use default front matter + content structure
+            final_content = f"---\n{front_matter}\n---\n\n{formatted_content}"
         
         # Write index.md file in bundle directory
         index_path = os.path.join(bundle_dir, 'index.md')
         with open(index_path, 'w', encoding='utf-8') as f:
-            f.write(blog_post)
+            f.write(final_content)
+        
+        # Clean up unused images from the bundle directory
+        self._cleanup_unused_images(bundle_dir, final_content)
         
         logger.info(f"Generated Hugo page bundle: {bundle_dir}")
         logger.info(f"Blog post created at: {index_path}")
-        return blog_post
+        return final_content
     
     def _generate_front_matter(
         self, 
@@ -65,7 +91,7 @@ class HugoGenerator:
         
         front_matter_dict = {
             'title': title,
-            'date': datetime.now().isoformat(),
+            'date': datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'),
             'draft': False,
             'tags': [],
             'categories': ['video'],
@@ -323,3 +349,65 @@ class HugoGenerator:
             yaml.dump(config_template, f, default_flow_style=False, indent=2)
         
         logger.info(f"Generated config template: {output_path}")
+    
+    def _cleanup_unused_images(self, bundle_dir: str, blog_content: str) -> None:
+        """Remove image files from bundle directory that aren't referenced in the blog post."""
+        import glob
+        
+        # Extract all image references from the blog content
+        referenced_images = self._extract_referenced_images(blog_content)
+        
+        # Find all image files in the bundle directory
+        image_patterns = ['*.jpg', '*.jpeg', '*.png', '*.gif', '*.webp']
+        all_images = []
+        
+        for pattern in image_patterns:
+            all_images.extend(glob.glob(os.path.join(bundle_dir, pattern)))
+        
+        # Get just the filenames for comparison
+        all_image_files = [os.path.basename(img) for img in all_images]
+        
+        # Find unused images
+        unused_images = []
+        for image_file in all_image_files:
+            if not any(image_file in ref for ref in referenced_images):
+                unused_images.append(image_file)
+        
+        # Remove unused images
+        removed_count = 0
+        total_size_saved = 0
+        
+        for unused_image in unused_images:
+            image_path = os.path.join(bundle_dir, unused_image)
+            try:
+                # Get file size before deletion
+                file_size = os.path.getsize(image_path)
+                os.remove(image_path)
+                removed_count += 1
+                total_size_saved += file_size
+                logger.info(f"Removed unused image: {unused_image}")
+            except OSError as e:
+                logger.warning(f"Could not remove {unused_image}: {e}")
+        
+        if removed_count > 0:
+            size_mb = total_size_saved / (1024 * 1024)
+            logger.info(f"Cleanup complete: Removed {removed_count} unused images, saved {size_mb:.2f} MB")
+        else:
+            logger.info("No unused images found - all images are referenced in the blog post")
+    
+    def _extract_referenced_images(self, content: str) -> List[str]:
+        """Extract all image filenames referenced in markdown content."""
+        import re
+        
+        # Match ![alt text](filename) pattern and extract just the filename
+        image_pattern = r'!\[.*?\]\(([^)]+)\)'
+        matches = re.findall(image_pattern, content)
+        
+        # Extract just the filename from full paths
+        referenced_files = []
+        for match in matches:
+            # Handle both relative paths and just filenames
+            filename = os.path.basename(match)
+            referenced_files.append(filename)
+        
+        return referenced_files

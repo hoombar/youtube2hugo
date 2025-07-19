@@ -35,7 +35,8 @@ class YouTube2Hugo:
         video_info: Optional[Dict] = None,
         front_matter: Optional[Dict] = None,
         transcript_path: Optional[str] = None,
-        save_transcript: bool = False
+        save_transcript: bool = False,
+        template_path: Optional[str] = None
     ) -> str:
         """Process a video and transcript into a Hugo blog post."""
         
@@ -84,7 +85,8 @@ class YouTube2Hugo:
                 frame_data=optimized_frames,
                 video_info=video_info,
                 output_path=output_path,
-                front_matter_data=front_matter
+                front_matter_data=front_matter,
+                template_path=template_path
             )
             
             # Note: Images are now copied to page bundle directory automatically
@@ -99,7 +101,7 @@ class YouTube2Hugo:
             logger.error(f"Error processing video: {e}")
             raise
         finally:
-            # Cleanup temporary files if needed
+            # Cleanup temporary files
             self._cleanup_temp_files(temp_dir)
     
     def _generate_title_from_path(self, video_path: str) -> str:
@@ -132,14 +134,32 @@ class YouTube2Hugo:
             return {'filename': os.path.basename(video_path)}
     
     def _cleanup_temp_files(self, temp_dir: str) -> None:
-        """Clean up temporary files if cleanup is enabled."""
+        """Clean up temporary files."""
         cleanup_enabled = self.config.get('cleanup_temp_files', True)
         
         if cleanup_enabled and os.path.exists(temp_dir):
             import shutil
             try:
+                # Count files and calculate size before deletion for reporting
+                file_count = 0
+                total_size = 0
+                for root, dirs, files in os.walk(temp_dir):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        try:
+                            total_size += os.path.getsize(file_path)
+                            file_count += 1
+                        except OSError:
+                            pass  # File might have been deleted already
+                
                 shutil.rmtree(temp_dir)
-                logger.info(f"Cleaned up temporary files: {temp_dir}")
+                
+                if file_count > 0:
+                    size_mb = total_size / (1024 * 1024)
+                    logger.info(f"Cleaned up {file_count} temporary files ({size_mb:.2f} MB): {temp_dir}")
+                else:
+                    logger.info(f"Cleaned up temporary directory: {temp_dir}")
+                    
             except Exception as e:
                 logger.warning(f"Could not clean up temp files: {e}")
 
@@ -155,10 +175,11 @@ def cli():
 @click.option('--title', help='Blog post title (auto-generated if not provided)')
 @click.option('--config', '-c', help='Path to configuration file')
 @click.option('--claude-api-key', help='Claude API key for transcript cleanup (or set ANTHROPIC_API_KEY env var)')
-@click.option('--whisper-model', default='base', help='Whisper model size (tiny, base, small, medium, large)')
+@click.option('--whisper-model', default='small', help='Whisper model size (tiny, base, small, medium, large)')
 @click.option('--save-transcript', is_flag=True, help='Save extracted transcript to .srt file')
+@click.option('--template', help='Path to blog post template file with {{placeholders}}')
 @click.option('--front-matter', help='Path to JSON file with additional front matter data')
-def convert(video, transcript, output, title, config, claude_api_key, whisper_model, save_transcript, front_matter):
+def convert(video, transcript, output, title, config, claude_api_key, whisper_model, save_transcript, template, front_matter):
     """Convert a video and transcript into a Hugo blog post."""
     
     # Load configuration
@@ -190,7 +211,8 @@ def convert(video, transcript, output, title, config, claude_api_key, whisper_mo
             title=title,
             front_matter=front_matter_data,
             transcript_path=transcript,
-            save_transcript=save_transcript
+            save_transcript=save_transcript,
+            template_path=template
         )
         
         click.echo(f"✅ Successfully generated Hugo blog post: {output}")

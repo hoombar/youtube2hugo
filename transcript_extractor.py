@@ -61,9 +61,7 @@ class TranscriptExtractor:
                 # Convert Whisper output to our format
                 segments = self._convert_whisper_segments(result['segments'])
                 
-                # Clean up transcript with Claude if available
-                if self.anthropic_client:
-                    segments = self._cleanup_transcript_with_claude(segments)
+                # Note: First pass transcript cleanup removed to avoid technical term errors
                 
                 logger.info(f"Extracted {len(segments)} transcript segments")
                 return segments
