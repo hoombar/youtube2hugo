@@ -1,0 +1,21 @@
+video_processing:
+  frame_sample_interval: 15      # Extract frame every N seconds
+  min_face_ratio: 0.4           # Skip frames where face > 40% of screen
+  max_face_ratio: 0.2           # Prefer frames where face < 20% of screen
+  face_detection_confidence: 0.5
+
+image_settings:
+  quality: 95                   # JPEG quality (1-100)
+  max_width: 1920              # Maximum image width
+  max_height: 1080             # Maximum image height
+
+transcript_settings:
+  context_window: 30           # Seconds of context around frames
+  whisper_model: "base"        # Whisper model: tiny, base, small, medium, large
+  claude_model: "claude-3-haiku-20240307"  # Claude model for cleanup
+  claude_api_key: ""           # Or set ANTHROPIC_API_KEY env var
+
+hugo_settings:
+  static_path: static/images    # Hugo static images path
+  content_path: content/posts   # Hugo content path
+  use_hugo_shortcodes: false   # Use {{< figure >}} shortcode instead of ![]()

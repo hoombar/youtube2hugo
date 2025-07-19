@@ -1,0 +1,79 @@
+1
+00:00:00,000 --> 00:00:05,000
+Welcome everyone to today's presentation on artificial intelligence and machine learning.
+
+2
+00:00:05,500 --> 00:00:12,000
+I'm excited to share with you some of the latest developments in this rapidly evolving field.
+
+3
+00:00:15,000 --> 00:00:22,000
+Let's start by looking at this diagram that shows the relationship between AI, machine learning, and deep learning.
+
+4
+00:00:25,000 --> 00:00:32,000
+As you can see here, artificial intelligence is the broader field that encompasses machine learning as a subset.
+
+5
+00:00:35,000 --> 00:00:42,000
+Machine learning, in turn, includes deep learning as one of its most powerful techniques.
+
+6
+00:00:45,000 --> 00:00:52,000
+Now, let's examine this chart that shows the growth of AI applications across different industries.
+
+7
+00:00:55,000 --> 00:01:02,000
+Healthcare leads the way with a 45% adoption rate, followed by finance at 38%.
+
+8
+00:01:05,000 --> 00:01:12,000
+The transportation industry is also showing significant growth, particularly with autonomous vehicles.
+
+9
+00:01:15,000 --> 00:01:22,000
+Moving on to the technical aspects, let's look at this neural network architecture diagram.
+
+10
+00:01:25,000 --> 00:01:32,000
+This shows a typical deep learning model with input layers, hidden layers, and output layers.
+
+11
+00:01:35,000 --> 00:01:42,000
+Each node in these layers performs specific computations that contribute to the overall learning process.
+
+12
+00:01:45,000 --> 00:01:52,000
+Here's an example of how this works in practice with image recognition tasks.
+
+13
+00:01:55,000 --> 00:02:02,000
+The model learns to identify features at different levels of abstraction.
+
+14
+00:02:05,000 --> 00:02:12,000
+Starting with simple edges and shapes in the early layers, moving to complex objects in deeper layers.
+
+15
+00:02:15,000 --> 00:02:22,000
+Let's now discuss the challenges and limitations of current AI systems.
+
+16
+00:02:25,000 --> 00:02:32,000
+One major challenge is the need for large amounts of high-quality training data.
+
+17
+00:02:35,000 --> 00:02:42,000
+Another significant issue is the interpretability of AI decisions, especially in critical applications.
+
+18
+00:02:45,000 --> 00:02:52,000
+Looking ahead, here are some exciting developments we can expect in the coming years.
+
+19
+00:02:55,000 --> 00:03:02,000
+Quantum machine learning promises to solve problems that are currently computationally intractable.
+
+20
+00:03:05,000 --> 00:03:12,000
+Thank you for your attention. I'll now take questions about any of the topics we've covered today.

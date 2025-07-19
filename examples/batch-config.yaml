@@ -1,0 +1,35 @@
+settings:
+  frame_sample_interval: 20
+  min_face_ratio: 0.35
+  image_quality: 90
+  whisper_model: "base"
+  claude_api_key: "your-claude-api-key"  # Or set ANTHROPIC_API_KEY env var
+  hugo_static_dir: "/path/to/hugo/static"
+
+videos:
+  - video: "videos/ai-introduction.mp4"
+    output: "content/posts/ai-introduction.md"
+    title: "Introduction to Artificial Intelligence"
+    save_transcript: true
+    front_matter:
+      tags: ["ai", "machine-learning", "introduction"]
+      categories: ["technology"]
+      author: "Dr. Jane Smith"
+      
+  - video: "videos/deep-learning-basics.mp4"
+    transcript: "transcripts/deep-learning-basics.vtt"  # Use existing transcript
+    output: "content/posts/deep-learning-basics.md"
+    title: "Deep Learning Fundamentals"
+    front_matter:
+      tags: ["deep-learning", "neural-networks"]
+      categories: ["technology", "education"]
+      series: "AI Fundamentals"
+      
+  - video: "videos/computer-vision-tutorial.mp4"
+    output: "content/posts/computer-vision-tutorial.md"
+    title: "Computer Vision with OpenCV"
+    save_transcript: true
+    front_matter:
+      tags: ["computer-vision", "opencv", "tutorial"]
+      categories: ["programming"]
+      difficulty: "intermediate"
