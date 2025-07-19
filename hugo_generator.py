@@ -55,7 +55,7 @@ class HugoGenerator:
         if template_path:
             template_variables = {
                 'title': title,
-                'date': datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'),
+                'date': datetime.now().strftime('%Y-%m-%dT00:00:00Z'),
                 'content': formatted_content
             }
             # Add custom front matter variables
@@ -91,7 +91,7 @@ class HugoGenerator:
         
         front_matter_dict = {
             'title': title,
-            'date': datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'),
+            'date': datetime.now().strftime('%Y-%m-%dT00:00:00Z'),
             'draft': False,
             'tags': [],
             'categories': ['video'],
