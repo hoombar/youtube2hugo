@@ -33,8 +33,9 @@ class BlogFormatter:
         """Format content with two-pass Claude processing while preserving image positions."""
         
         if not self.anthropic_client:
-            logger.info("No Claude API available, returning original content")
-            return content_with_images
+            error_msg = "Claude API key is required for blog formatting. Please set ANTHROPIC_API_KEY environment variable or use --claude-api-key option."
+            logger.error(error_msg)
+            raise ValueError(error_msg)
         
         # Extract image references from original content for validation
         original_images = self._extract_image_references(content_with_images)
@@ -46,6 +47,15 @@ class BlogFormatter:
         logger.info("Formatting content as blog post with Claude API...")
         formatted_content = self._format_as_blog_post(enhanced_content, title)
         
+        # Validate that the output has proper blog structure
+        if not self._validate_blog_structure(formatted_content):
+            logger.error("Claude failed to create proper blog structure. Retrying...")
+            # Try once more with stronger prompt
+            formatted_content = self._format_as_blog_post_strict(enhanced_content, title)
+            if not self._validate_blog_structure(formatted_content):
+                logger.error("Claude failed to format content properly after retry")
+                raise ValueError("Failed to generate properly structured blog post. Claude API may be having issues.")
+        
         # Validate that images are reasonably preserved (allow for minor differences)
         formatted_images = self._extract_image_references(formatted_content)
         
@@ -53,8 +63,7 @@ class BlogFormatter:
         image_diff = abs(len(original_images) - len(formatted_images))
         if image_diff > 2:
             logger.warning(f"Too many images lost! Original: {len(original_images)}, Formatted: {len(formatted_images)}")
-            logger.warning("Falling back to original content to preserve images")
-            return content_with_images
+            raise ValueError("Image preservation failed during formatting")
         
         # Check for catastrophic content loss (more than 50% reduction indicates major problems)
         original_length = len(content_with_images.replace(' ', '').replace('\n', ''))
@@ -62,10 +71,9 @@ class BlogFormatter:
         
         if formatted_length < original_length * 0.5:
             logger.warning(f"Catastrophic content reduction detected! Original: {original_length} chars, Formatted: {formatted_length} chars")
-            logger.warning("Falling back to original content to preserve information")
-            return content_with_images
+            raise ValueError("Content preservation failed during formatting")
         
-        logger.info(f"Successfully preserved all {len(original_images)} images and content in formatted output")
+        logger.info(f"Successfully generated structured blog post with {len(self._extract_headers(formatted_content))} sections")
         return formatted_content
     
     def _format_as_blog_post(self, content: str, title: str) -> str:
@@ -75,8 +83,8 @@ class BlogFormatter:
         
         try:
             response = self.anthropic_client.messages.create(
-                model=self.config.get('claude_model', 'claude-3-haiku-20240307'),
-                max_tokens=8000,  # Increased to ensure we don't truncate content
+                model=self.config.get('claude_model', 'claude-4-sonnet-20250514'),
+                max_tokens=8000,  # Sonnet supports higher token limits
                 temperature=0.2,  # Lower temperature for more consistent preservation
                 messages=[
                     {
@@ -107,30 +115,34 @@ CRITICAL PRESERVATION REQUIREMENTS:
 4. **PRESERVE TECHNICAL DETAILS**: Keep all technical information, examples, and explanations
 
 MANDATORY BLOG STRUCTURE REQUIREMENTS:
-- **MUST start with a compelling introduction** (2-3 sentences that hook the reader and explain what they'll learn)
-- **MUST add clear section headers** using ## for main topics and ### for subtopics
-- **MUST break up long paragraphs** - aim for 3-4 sentences per paragraph maximum
-- **MUST add smooth transitions** between sections to improve flow
-- **MUST transform transcript language** to be more engaging and written-style (remove "so", "right", "now", filler words)
-- **MUST add a strong conclusion** that summarizes key takeaways and next steps
+- **MUST start with a compelling introduction** using "## Introduction" header
+- **MUST create AT LEAST 5-7 clear section headers** using ## format for main topics
+- **MUST break up ALL long paragraphs** - maximum 3-4 sentences per paragraph
+- **MUST eliminate ALL transcript language** (remove "Right", "So", "Now", "Let's", "Okay")
+- **MUST add a "## Conclusion" section** that summarizes key takeaways
 
-SPECIFIC STRUCTURAL IMPROVEMENTS:
-- Transform "Right, so you want to know..." into "Building a reliable ZigBee network requires..."
-- Convert "Let's talk about..." into proper section headers like "## Channel Selection Strategy"
-- Break up walls of text into digestible paragraphs
-- Add logical section breaks where topics change
-- Improve sentence flow and remove conversational speech patterns
-- Add context around images to make them more relevant
+CRITICAL SECTION CREATION RULES:
+- EVERY major topic change MUST have a ## header
+- Look for topic transitions like equipment discussion → placement → channel selection → troubleshooting
+- Convert ANY mention of "let's talk about X" into "## X"
+- Convert ANY mention of "now we're going to cover Y" into "## Y" 
+- Add ## headers before discussing ANY new concept or tool
 
-SUGGESTED SECTION STRUCTURE (adapt as needed):
+REQUIRED SECTION STRUCTURE (YOU MUST USE THESE):
 ## Introduction
-## Choosing the Right Coordinator
-## Strategic Device Placement
-## Channel Selection and Interference
-## Understanding Network Types: Routers vs End Devices
-## Building an Effective Mesh Network
-## Advanced Troubleshooting with Log Analysis
-## Conclusion and Best Practices
+## [Topic 1 - extract from content]
+## [Topic 2 - extract from content] 
+## [Topic 3 - extract from content]
+## [Topic 4 - extract from content]
+## [Topic 5 - extract from content]
+## Conclusion
+
+AGGRESSIVE TRANSFORMATION EXAMPLES:
+- "Right, so you want to know how to build..." → "## Introduction\n\nBuilding a reliable ZigBee network..."
+- "Let's dive straight into the foundation" → "## ZigBee Coordinator Fundamentals"
+- "Right, let's talk about channel selection" → "## Channel Selection Strategy"
+- "Now let's get into how the network works" → "## Understanding Network Architecture"
+- "Okay, this is what separates beginners from advanced users" → "## Advanced Log Analysis Techniques"
 
 FORMATTING IMPROVEMENTS (while preserving everything above):
 - Transform conversational/spoken language into polished written style
@@ -152,15 +164,34 @@ WHAT NOT TO DO:
 
 Your goal is to transform transcript-style content into engaging blog format while preserving every detail and image.
 
-VERIFICATION CHECKLIST before returning:
+CRITICAL VERIFICATION CHECKLIST - OUTPUT WILL BE REJECTED IF ANY ITEM IS MISSING:
+✓ Output contains AT LEAST 5 section headers starting with "##"
+✓ First section is "## Introduction"
+✓ Last section is "## Conclusion" 
+✓ NO paragraphs longer than 4 sentences
+✓ NO transcript language ("Right", "So", "Now", "Let's", "Okay")
 ✓ All ![...](filename.jpg) references are present and unchanged
 ✓ Images remain in their original positions relative to text
 ✓ All technical content and examples are preserved
-✓ Content is broken into clear, logical sections with headers
-✓ Paragraphs are properly sized (3-4 sentences max)
-✓ Conversational language is transformed to written style
 
-Return the complete formatted blog post content (no front matter). The output should be similar or longer in length, never significantly shorter."""
+EXAMPLE OF WHAT YOUR OUTPUT SHOULD LOOK LIKE:
+## Introduction
+[2-3 engaging sentences about the topic]
+
+## [Clear Topic Header]
+[3-4 sentence paragraph about this topic]
+
+![Alt text](image.jpg)
+
+[Another 3-4 sentence paragraph]
+
+## [Another Clear Topic Header]
+[Content continues with proper structure]
+
+## Conclusion
+[Summary and key takeaways]
+
+Return the complete formatted blog post content (no front matter). Must contain clear ## section headers throughout."""
     
     def apply_template(
         self, 
@@ -234,8 +265,8 @@ Return only the cleaned transcript text:
         
         try:
             response = self.anthropic_client.messages.create(
-                model=self.config.get('claude_model', 'claude-3-haiku-20240307'),
-                max_tokens=6000,  # Increased to ensure we don't truncate content
+                model=self.config.get('claude_model', 'claude-4-sonnet-20250514'),
+                max_tokens=6000,  # Sonnet supports higher token limits
                 temperature=0.1,
                 messages=[
                     {
@@ -335,6 +366,90 @@ Return only the cleaned transcript text:
         enhanced_content = re.sub(image_pattern, enhance_image_reference, content)
         
         return enhanced_content
+    
+    def _validate_blog_structure(self, content: str) -> bool:
+        """Validate that content has proper blog structure with sections."""
+        headers = self._extract_headers(content)
+        
+        # Must have at least 5 sections
+        if len(headers) < 5:
+            logger.warning(f"Only {len(headers)} sections found, need at least 5")
+            return False
+        
+        # Must start with Introduction
+        if not headers[0].lower().strip().startswith('introduction'):
+            logger.warning(f"First section is '{headers[0]}', should be 'Introduction'")
+            return False
+        
+        # Must end with Conclusion
+        if not headers[-1].lower().strip().startswith('conclusion'):
+            logger.warning(f"Last section is '{headers[-1]}', should be 'Conclusion'")
+            return False
+        
+        # Check for transcript artifacts
+        transcript_artifacts = ['right,', 'so,', "let's", 'now,', 'okay,']
+        content_lower = content.lower()
+        for artifact in transcript_artifacts:
+            if artifact in content_lower:
+                logger.warning(f"Found transcript artifact: '{artifact}'")
+                return False
+        
+        return True
+    
+    def _extract_headers(self, content: str) -> List[str]:
+        """Extract all ## headers from content."""
+        import re
+        header_pattern = r'^## (.+)$'
+        headers = re.findall(header_pattern, content, re.MULTILINE)
+        return headers
+    
+    def _format_as_blog_post_strict(self, content: str, title: str) -> str:
+        """Strict formatting with even stronger requirements."""
+        prompt = f"""URGENT: Transform this transcript into a properly structured blog post titled "{title}".
+
+THIS IS YOUR SECOND ATTEMPT. THE FIRST ATTEMPT FAILED VALIDATION.
+
+MANDATORY REQUIREMENTS (YOUR OUTPUT WILL BE REJECTED IF MISSING):
+1. Must start with exactly "## Introduction"
+2. Must have AT LEAST 5 total sections with ## headers
+3. Must end with exactly "## Conclusion"  
+4. NO transcript words: "Right", "So", "Let's", "Now", "Okay" anywhere
+5. Maximum 3 sentences per paragraph
+6. All images ![...](file.jpg) must be preserved exactly
+
+EXAMPLE STRUCTURE YOU MUST FOLLOW:
+## Introduction
+Brief engaging intro about the topic.
+
+## [Topic Name]
+Short paragraph about this topic. Never more than 3 sentences.
+
+![Description](image.jpg)
+
+Another short paragraph. Keep it concise.
+
+## [Next Topic]
+Continue with proper structure.
+
+## Conclusion
+Summary of key points.
+
+Content to transform:
+{content}
+
+CRITICAL: Your output MUST start with "## Introduction" and end with "## Conclusion"."""
+        
+        try:
+            response = self.anthropic_client.messages.create(
+                model=self.config.get('claude_model', 'claude-4-sonnet-20250514'),
+                max_tokens=8000,
+                temperature=0.1,  # Very low temperature for consistent structure
+                messages=[{"role": "user", "content": prompt}]
+            )
+            return response.content[0].text.strip()
+        except Exception as e:
+            logger.error(f"Error in strict blog formatting: {e}")
+            raise
     
     def _extract_image_references(self, content: str) -> List[str]:
         """Extract all image references from content."""
