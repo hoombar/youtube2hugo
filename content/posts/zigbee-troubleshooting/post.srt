@@ -1,0 +1,492 @@
+1
+00:00:00,000 --> 00:00:04,139
+Right, so you want to know how to build a proper ZigBee network that actually works
+
+2
+00:00:04,519 --> 00:00:08,759
+reliably, or maybe you're doing battle with your current existing mesh network. Either way, you're in
+
+3
+00:00:08,759 --> 00:00:12,539
+the right place because today we're going to cover everything from the absolute basics, like why
+
+4
+00:00:12,859 --> 00:00:17,699
+your device placement matters, all the way through to enumerating errors in your logs. We'll talk
+
+5
+00:00:18,260 --> 00:00:23,640
+coordinators, routers versus end devices, channel selection, interference, and yes, we'll even dive into log files,
+
+6
+00:00:24,000 --> 00:00:29,320
+which often people tend to ignore, but they play a key role in diagnosing issues and
+
+7
+00:00:29,320 --> 00:00:33,979
+building a rock-solid setup. So as the video goes on, topics are going to get progressively
+
+8
+00:00:34,060 --> 00:00:36,240
+more advanced. Let's dive straight into the foundation, your coordinator. Now, I can't stress this enough.
+
+9
+00:00:43,240 --> 00:00:48,600
+The coordinator is basically the brain of your entire ZigBee network. Pick a poor one, and
+
+10
+00:00:48,880 --> 00:00:53,320
+you're going to be fighting connectivity issues for months. Pick a good one and everything just
+
+11
+00:00:53,320 --> 00:00:57,640
+works. Well, kind of, we'll get into that. So when it comes to choosing a coordinator,
+
+12
+00:00:57,640 --> 00:01:03,280
+do your research, and I mean, properly research it. Don't just grab the first USB stick
+
+13
+00:01:03,500 --> 00:01:08,819
+you find on Amazon because it's cheap. Read reviews, check compatibility, look at the community forums.
+
+14
+00:01:08,819 --> 00:01:15,040
+The few extra pounds that you spend here is going to save you weeks of frustration
+
+15
+00:01:15,599 --> 00:01:19,780
+later. What I'm using right now is the SLZB06M. I'll pop a link down in the
+
+16
+00:01:20,099 --> 00:01:27,400
+description for that. It's actually not a USB stick. It's a Power Over Ethernet coordinator, and
+
+17
+00:01:27,400 --> 00:01:33,680
+I absolutely love it. I would highly recommend them. It's been absolutely rock-solid for me, and
+
+18
+00:01:33,700 --> 00:01:38,299
+the range is fantastic. But here's the thing, even if you've got the best coordinator in
+
+19
+00:01:38,500 --> 00:01:41,760
+the world, placement matters more than you might think. We'll cover that a little bit more
+
+20
+00:01:42,260 --> 00:01:47,420
+later on in the video. If you're using a USB coordinator, and there are lots of
+
+21
+00:01:47,700 --> 00:01:51,680
+people out there who are, you absolutely need to use a USB extension cable. Why? Because
+
+22
+00:01:51,680 --> 00:01:58,859
+USB 3 ports can cause electromagnetic interference through your ZigBee channel. This isn't some theoretical problem
+
+23
+00:01:58,859 --> 00:02:04,019
+either. It's actually real. There's a really good video that was demonstrated by the people at
+
+24
+00:02:04,040 --> 00:02:09,639
+Nabakusa, who show that moving a USB cable closer to a coordinator actually stops it from
+
+25
+00:02:09,960 --> 00:02:16,340
+working. This is the sort of thing that will drive you absolutely mad trying to figure
+
+26
+00:02:16,500 --> 00:02:20,039
+out why devices keep on dropping offline. It's going to be very erratic and difficult to
+
+27
+00:02:20,039 --> 00:02:24,759
+troubleshoot. Definitely make sure that you're using a shielded extension cable. A simple extension cable costs
+
+28
+00:02:25,099 --> 00:02:28,080
+next to nothing and it can literally save your entire network. Get the coordinator away from
+
+29
+00:02:28,500 --> 00:02:32,620
+your computer and away from any USB 3 ports, and ideally somewhere central in your home.
+
+30
+00:02:33,300 --> 00:02:37,699
+Think about your home's layout. Where are the devices actually going to be, and what's going
+
+31
+00:02:38,060 --> 00:02:41,280
+to be between them? A central location on the ground floor might not help much if
+
+32
+00:02:41,719 --> 00:02:45,800
+half of your devices are upstairs. If the middle of your house is surrounded by solid
+
+33
+00:02:45,800 --> 00:02:50,539
+walls, then consider that 2.4 GHz signals might not travel through them particularly well. Now here's
+
+34
+00:02:51,020 --> 00:02:55,979
+something that catches a lot of people out. Connecting directly to your coordinator might seem fast
+
+35
+00:02:55,979 --> 00:02:58,180
+and like a good idea, but be aware there is a device limit on coordinators. You
+
+36
+00:02:58,560 --> 00:03:00,860
+should check the documentation exactly for what the device limit is on your coordinator. This is
+
+37
+00:03:01,099 --> 00:03:05,300
+generally okay when you're starting out in your ZigBee network and you've got a handful of
+
+38
+00:03:05,879 --> 00:03:10,580
+devices on them, but if you get the bug and you end up with 80 devices
+
+39
+00:03:10,580 --> 00:03:15,560
+on your network, you'll start to see problems. What you're ultimately aiming for is a mesh
+
+40
+00:03:15,560 --> 00:03:19,879
+network. Right, let's talk about something that will save you massive headaches if you get it
+
+41
+00:03:19,879 --> 00:03:24,159
+right from the start, which is channel selection. ZigBee works on 2.4 GHz, which is the
+
+42
+00:03:24,539 --> 00:03:26,939
+same frequency as your WiFi, your microwave, and half the electronics in your house. The key
+
+43
+00:03:27,199 --> 00:03:32,240
+is finding a channel that doesn't clash with anything else. Use an app like WiFi Analyzer,
+
+44
+00:03:32,240 --> 00:03:37,879
+again there's a link down in the description, to check what channels your surrounding 2.4 GHz
+
+45
+00:03:37,879 --> 00:03:43,439
+WiFi are using. You want to pick a ZigBee channel that's far away from busy WiFi
+
+46
+00:03:43,439 --> 00:03:48,340
+channels as possible. Here's the critical bit, make the decision at the start. If you change
+
+47
+00:03:48,340 --> 00:03:53,199
+your ZigBee channel later, you'll have to repair every single device in your network, and trust
+
+48
+00:03:54,000 --> 00:03:58,039
+me, you don't want to have to do that with 50 plus devices. Now let's get
+
+49
+00:03:58,419 --> 00:04:03,939
+into the integrity of how the network actually works. You've got three types of devices. You've
+
+50
+00:04:03,939 --> 00:04:09,219
+got your coordinator, which we've covered, and you've also got routers and end devices. Understanding the
+
+51
+00:04:09,219 --> 00:04:14,479
+difference is crucial for a reliable network. Routers are typically devices that have constant power, so
+
+52
+00:04:14,539 --> 00:04:19,819
+your smart plugs, your light switches, your smart bulbs. Be careful though, because not all powered
+
+53
+00:04:19,819 --> 00:04:25,180
+devices are routers. You should check the documentation for that. It's a dangerous assumption to make
+
+54
+00:04:25,920 --> 00:04:30,939
+that all powered devices will be routers. Some manufacturers make mains-powered devices that only act as
+
+55
+00:04:31,279 --> 00:04:37,199
+end devices, which is pretty useless for building a strong mesh network. I got caught out
+
+56
+00:04:37,199 --> 00:04:42,819
+here by buying some of the Acuity H1 light switches, assuming that they would work as
+
+57
+00:04:42,819 --> 00:04:48,500
+routers. End devices are your battery-powered sensors like motion sensors, door sensors, temperature sensors, that kind
+
+58
+00:04:48,500 --> 00:04:54,339
+of stuff. These little guys don't route traffic like other devices. They just connect to your
+
+59
+00:04:54,339 --> 00:04:58,399
+network and send their data, but they won't route packets through them to other devices. Typically,
+
+60
+00:04:59,240 --> 00:05:04,579
+devices can connect to any router in range. Some can be quite picky about which routers
+
+61
+00:05:04,579 --> 00:05:09,860
+they connect to, though. If you try and pair your device in their final position, that
+
+62
+00:05:09,860 --> 00:05:15,220
+tends to help with the routing. Don't pair them next to your coordinator and then move
+
+63
+00:05:15,220 --> 00:05:20,319
+them across the house. They'll try and maintain the original connection even if there's a better
+
+64
+00:05:20,319 --> 00:05:27,620
+route nearby. Now the mesh itself is where ZigBee gets really clever. ZigBee devices form their
+
+65
+00:05:27,980 --> 00:05:32,060
+mesh automatically. It sounds great in theory. There's something that most people don't realize though. It
+
+66
+00:05:32,060 --> 00:05:38,060
+takes time, and I'm not just talking hours or even days, but some ZigBee networks can
+
+67
+00:05:38,060 --> 00:05:44,120
+take weeks to establish themselves so that they're fully optimized. This is probably the hardest part
+
+68
+00:05:44,120 --> 00:05:49,800
+for most people because everyone wants things to work right away, but your devices are constantly
+
+69
+00:05:49,800 --> 00:05:55,079
+learning about each other and figuring out the best routes and adapting to changes in their
+
+70
+00:05:55,079 --> 00:06:00,639
+environment. So patience is absolutely key here. Something that may well save you hours of troubleshooting
+
+71
+00:06:00,639 --> 00:06:05,720
+is knowing that some devices are what I call "sticky." So Acuity devices and Taurus are
+
+72
+00:06:05,720 --> 00:06:11,180
+like this - they latch onto the first router they connect to and they'll refuse to
+
+73
+00:06:12,139 --> 00:06:17,939
+jump to a better router even if the signal strength is terrible. That's why pairing in
+
+74
+00:06:17,939 --> 00:06:23,740
+the final position for these kinds of devices is especially important. Don't overload routers either. They
+
+75
+00:06:23,740 --> 00:06:28,379
+have limits on how many devices they can handle typically. The good news is you can
+
+76
+00:06:28,379 --> 00:06:33,220
+actually pair end devices with specific routers if you know what you're doing. I use ZigBee
+
+77
+00:06:33,800 --> 00:06:38,660
+to MQTT, and there's an option to open up pairing on the network for specific devices,
+
+78
+00:06:38,879 --> 00:06:42,339
+so I highly encourage trying that out. Okay, this is what separates the beginners from advanced
+
+79
+00:06:42,339 --> 00:06:47,899
+users - deep diving into log files. Most people will tend to ignore their logs, but
+
+80
+00:06:47,899 --> 00:06:53,500
+the logs are basically telling a story about what's happening on your network, and trust me,
+
+81
+00:06:53,500 --> 00:07:00,120
+once you know how to read them, troubleshooting becomes so much more easy. Okay, so here
+
+82
+00:07:00,120 --> 00:07:04,540
+we have the entire database with all of the ZigBee devices in. We've got the configuration,
+
+83
+00:07:04,540 --> 00:07:09,740
+which will basically give us a mapping of those ZigBee devices over to a friendly name,
+
+84
+00:07:09,740 --> 00:07:15,560
+and we have the log file, which is where all the fun things are happening. So
+
+85
+00:07:15,560 --> 00:07:22,259
+if we look at the root error "many to one failures" and we look at this
+
+86
+00:07:22,259 --> 00:07:27,740
+as an example of one of the things that's going wrong, you can see it happens
+
+87
+00:07:28,359 --> 00:07:34,040
+quite a lot throughout the logs, and this is one of the things that we want
+
+88
+00:07:34,040 --> 00:07:40,079
+to dive into. But there is all of these log file instances, and we don't really
+
+89
+00:07:40,079 --> 00:07:47,459
+want to go through and manually figure out often this is happening. So what we're going
+
+90
+00:07:47,459 --> 00:07:54,819
+to do is take the log file and we're going to use the ID that we
+
+91
+00:07:56,339 --> 00:08:06,319
+get from here, and we're going to figure out from here what that ID is, and
+
+92
+00:08:06,319 --> 00:08:12,319
+that will tell us it's this particular manufacturing device or device with this manufacturing name. It's
+
+93
+00:08:12,319 --> 00:08:20,139
+going to give us an IEEE address, and then we can use that IEEE address to
+
+94
+00:08:20,139 --> 00:08:30,839
+look up in here what the friendly name is. So you can see here it's the
+
+95
+00:08:30,839 --> 00:08:38,179
+Snug LED Vance socket. So we can map this error, which happens a lot for this
+
+96
+00:08:38,179 --> 00:08:44,379
+particular ID, all the way back to the Snug LED Vance socket. So I don't want
+
+97
+00:08:44,379 --> 00:08:49,759
+to do that manually, so I'm going to use my friend Claude, and here's one I
+
+98
+00:08:49,759 --> 00:08:58,460
+made earlier. What I've done is I've uploaded a bunch of some of the old log
+
+99
+00:08:58,460 --> 00:09:06,500
+files and the old configurations, so you can see a before and after, and I've taken
+
+100
+00:09:06,500 --> 00:09:12,539
+basically this prompt and I've said, using the old logs, the old configurations, and the old
+
+101
+00:09:12,539 --> 00:09:19,759
+database, find this particular error and various other errors, and then go through and do all
+
+102
+00:09:19,860 --> 00:09:27,960
+of that mapping so we can figure out what it looks like. It's going to go
+
+103
+00:09:27,960 --> 00:09:33,960
+through and do its magic, and we're going to get this artifact, and it's going to
+
+104
+00:09:33,960 --> 00:09:43,759
+tell us what the friendly name is, the IEEE address, and the errors and how critical
+
+105
+00:09:43,759 --> 00:09:51,000
+those errors are, how often they're occurring in the logs, and stuff like that. So you
+
+106
+00:09:51,000 --> 00:09:57,919
+can leverage this quite easily to figure out what's going on your network. I also used,
+
+107
+00:09:57,919 --> 00:10:03,580
+if I go back to my network, the newer version after I'd basically gone through and
+
+108
+00:10:03,580 --> 00:10:10,519
+fixed a bunch of my issues, and I ran the same analysis, and basically got a
+
+109
+00:10:10,519 --> 00:10:17,919
+similar result, but you can see here the numbers are much lower. There's basically only some
+
+110
+00:10:17,919 --> 00:10:25,580
+very, very low-severity errors. Some of them are actually due to things like configuration timeouts, and
+
+111
+00:10:25,580 --> 00:10:29,900
+Claude's very useful here and basically tells me that this is basically not much of an
+
+112
+00:10:30,179 --> 00:10:35,080
+issue. It's a fairly transient issue that happens during startup, and it's going to tell me
+
+113
+00:10:36,919 --> 00:10:41,960
+a few recommendations, and in conclusion, the cleanup was highly successful. Brilliant. So I'm still going
+
+114
+00:10:41,960 --> 00:10:46,940
+to use the logs, and I'm going to look through the logs to get some hints
+
+115
+00:10:47,620 --> 00:10:52,639
+on what I might be looking for, and then I'm going to use AI to help
+
+116
+00:10:52,639 --> 00:10:57,960
+me enumerate those instances and figure out what needs to happen next. Look, building a reliable
+
+117
+00:10:57,960 --> 00:11:03,460
+ZigBee network isn't rocket science, but it does require a bit of patience and understanding on
+
+118
+00:11:03,460 --> 00:11:09,019
+how these devices actually work together. Start with a coordinator, choose your channels carefully, understand the
+
+119
+00:11:09,019 --> 00:11:13,639
+difference between routers and end devices, and most importantly, learn to read your logs. Do this
+
+120
+00:11:13,639 --> 00:11:17,559
+right, and you'll have a great network that's incredibly reliable, responsive, and just works. Get it
+
+121
+00:11:17,559 --> 00:11:22,639
+wrong, and you'll be constantly fighting connectivity issues and wondering why your smart home feels like
+
+122
+00:11:22,639 --> 00:11:27,720
+a dumb home. If this video helped you out, don't forget to hit that like button
+
+123
+00:11:27,879 --> 00:11:29,620
+and subscribe for more smart home content. Check out the description for all the links I mentioned, and leave a comment down below. What's your biggest ZigBee challenge? Did I cover everything? Do you think I missed anything? Let me know. I read every comment, and I often turn them into future videos, so don't be shy. Until next time, happy automating, and I'll catch you in the next one.
+

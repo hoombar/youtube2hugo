@@ -55,10 +55,9 @@ python main.py convert --video video.mp4 --output blog-post.md
 export ANTHROPIC_API_KEY="your-claude-api-key"
 python main.py convert \
   --video presentation.mp4 \
-  --output content/posts/my-presentation.md \
+  --output content/posts/my-presentation \
   --title "My Amazing Presentation" \
-  --save-transcript \
-  --hugo-static-dir /path/to/hugo/static
+  --save-transcript
 ```
 
 ### Using existing transcript:
@@ -99,9 +98,7 @@ image_settings:
   max_height: 1080             # Maximum image height
 
 hugo_settings:
-  static_path: "static/images"  # Hugo static images path
-  content_path: "content/posts" # Hugo content path
-  use_hugo_shortcodes: false   # Use {{< figure >}} shortcode
+  use_hugo_shortcodes: false   # Use {{< figure >}} shortcode instead of ![]()
 
 transcript_settings:
   context_window: 30           # Seconds of context around frames
@@ -123,7 +120,6 @@ settings:
   min_face_ratio: 0.35
   whisper_model: "base"
   claude_api_key: "your-claude-api-key"
-  hugo_static_dir: "/path/to/hugo/static"
 
 videos:
   - video: "videos/presentation1.mp4"
@@ -169,10 +165,44 @@ The application uses MediaPipe for face detection to analyze video frames:
 
 - Generates proper Hugo front matter (title, date, tags, etc.)
 - Creates clean markdown with embedded images
-- Organizes images in Hugo static folder structure
+- **Page Bundle Structure**: Creates a folder for each post with `index.md` and images
+- **Relative Image Paths**: Images are referenced relative to the post (e.g., `image.jpg` not `/static/images/image.jpg`)
 - Supports both standard markdown and Hugo shortcodes
 
-## File Structure
+## Output Structure
+
+The tool creates Hugo page bundles, which are self-contained folders for each blog post:
+
+```
+content/posts/
+└── my-video-post/           # Page bundle directory
+    ├── index.md             # Blog post content with front matter
+    ├── frame_45.0s.jpg      # Video frame at 45 seconds
+    ├── frame_120.0s.jpg     # Video frame at 120 seconds
+    └── frame_300.0s.jpg     # Video frame at 300 seconds
+```
+
+**Benefits of Page Bundles:**
+- **Self-contained**: All resources (images) are stored with the post
+- **Portable**: Easy to move or backup entire posts
+- **Relative paths**: Images use simple filenames like `frame_45.0s.jpg`
+- **Hugo native**: Follows Hugo's recommended page bundle structure
+
+**Example output:**
+```markdown
+---
+title: "My Video Presentation"
+date: "2024-01-15T10:30:00"
+---
+
+Welcome to this presentation on machine learning fundamentals.
+
+![Visual content from video at 45s](frame_45.0s.jpg)
+
+Let's explore the key concepts that drive modern AI systems...
+```
+
+## Project File Structure
 
 ```
 youtube2hugo/

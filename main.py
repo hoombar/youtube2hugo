@@ -87,12 +87,8 @@ class YouTube2Hugo:
                 front_matter_data=front_matter
             )
             
-            # Copy images to Hugo static directory if specified
-            hugo_static_dir = self.config.get('hugo_static_dir')
-            if hugo_static_dir and os.path.exists(hugo_static_dir):
-                self.hugo_generator.copy_images_to_hugo_static(
-                    optimized_frames, hugo_static_dir
-                )
+            # Note: Images are now copied to page bundle directory automatically
+            # No need for separate Hugo static directory copying
             
             logger.info(f"Successfully generated blog post: {output_path}")
             logger.info(f"Extracted {len(optimized_frames)} relevant images")
@@ -161,9 +157,8 @@ def cli():
 @click.option('--claude-api-key', help='Claude API key for transcript cleanup (or set ANTHROPIC_API_KEY env var)')
 @click.option('--whisper-model', default='base', help='Whisper model size (tiny, base, small, medium, large)')
 @click.option('--save-transcript', is_flag=True, help='Save extracted transcript to .srt file')
-@click.option('--hugo-static-dir', help='Path to Hugo static directory for image copying')
 @click.option('--front-matter', help='Path to JSON file with additional front matter data')
-def convert(video, transcript, output, title, config, claude_api_key, whisper_model, save_transcript, hugo_static_dir, front_matter):
+def convert(video, transcript, output, title, config, claude_api_key, whisper_model, save_transcript, front_matter):
     """Convert a video and transcript into a Hugo blog post."""
     
     # Load configuration
@@ -178,8 +173,6 @@ def convert(video, transcript, output, title, config, claude_api_key, whisper_mo
         config_dict['claude_api_key'] = claude_api_key
     if whisper_model:
         config_dict['whisper_model'] = whisper_model
-    if hugo_static_dir:
-        config_dict['hugo_static_dir'] = hugo_static_dir
     
     # Load additional front matter
     front_matter_data = None

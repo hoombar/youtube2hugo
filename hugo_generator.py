@@ -25,27 +25,34 @@ class HugoGenerator:
         output_path: str,
         front_matter_data: Optional[Dict] = None
     ) -> str:
-        """Generate a complete Hugo blog post with front matter and content."""
+        """Generate a complete Hugo blog post with front matter and content in page bundle format."""
+        
+        # Create page bundle directory structure
+        bundle_dir = self._create_page_bundle_structure(output_path)
+        
+        # Copy images to bundle directory
+        self._copy_images_to_bundle(frame_data, bundle_dir)
         
         # Generate front matter
         front_matter = self._generate_front_matter(
             title, video_info, front_matter_data
         )
         
-        # Generate content with smart image placement
+        # Generate content with smart image placement (using relative paths)
         content = self._generate_content_with_images(
-            transcript_segments, frame_data
+            transcript_segments, frame_data, bundle_dir
         )
         
         # Combine front matter and content
         blog_post = f"---\n{front_matter}\n---\n\n{content}"
         
-        # Write to file
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with open(output_path, 'w', encoding='utf-8') as f:
+        # Write index.md file in bundle directory
+        index_path = os.path.join(bundle_dir, 'index.md')
+        with open(index_path, 'w', encoding='utf-8') as f:
             f.write(blog_post)
         
-        logger.info(f"Generated Hugo blog post: {output_path}")
+        logger.info(f"Generated Hugo page bundle: {bundle_dir}")
+        logger.info(f"Blog post created at: {index_path}")
         return blog_post
     
     def _generate_front_matter(
@@ -80,10 +87,46 @@ class HugoGenerator:
         
         return yaml.dump(front_matter_dict, default_flow_style=False)
     
+    def _create_page_bundle_structure(self, output_path: str) -> str:
+        """Create Hugo page bundle directory structure."""
+        # If output_path ends with .md, remove it to create the bundle directory
+        if output_path.endswith('.md'):
+            bundle_dir = output_path[:-3]
+        else:
+            bundle_dir = output_path
+            
+        # Create the bundle directory
+        os.makedirs(bundle_dir, exist_ok=True)
+        
+        return bundle_dir
+    
+    def _copy_images_to_bundle(self, frame_data: List[Dict], bundle_dir: str) -> None:
+        """Copy optimized images to the page bundle directory."""
+        import shutil
+        
+        for frame in frame_data:
+            if not frame.get('should_include', False):
+                continue
+                
+            source_path = frame.get('optimized_path', frame['path'])
+            if not os.path.exists(source_path):
+                continue
+                
+            filename = os.path.basename(source_path)
+            dest_path = os.path.join(bundle_dir, filename)
+            
+            shutil.copy2(source_path, dest_path)
+            
+            # Update frame data with new bundle-relative path
+            frame['bundle_path'] = filename
+            
+            logger.info(f"Copied image to bundle: {dest_path}")
+    
     def _generate_content_with_images(
         self, 
         transcript_segments: List[Dict], 
-        frame_data: List[Dict]
+        frame_data: List[Dict],
+        bundle_dir: Optional[str] = None
     ) -> str:
         """Generate blog content with intelligently placed images."""
         
@@ -234,10 +277,12 @@ class HugoGenerator:
     def _get_hugo_image_path(self, frame: Dict) -> str:
         """Get the Hugo-compatible path for an image."""
         
-        # Use optimized image if available, otherwise original
-        image_path = frame.get('optimized_path', frame['path'])
+        # If we have a bundle path (relative to the post), use that
+        if 'bundle_path' in frame:
+            return frame['bundle_path']
         
-        # Convert to relative path for Hugo
+        # Fallback to original behavior for compatibility
+        image_path = frame.get('optimized_path', frame['path'])
         filename = os.path.basename(image_path)
         static_path = self.config.get('hugo_static_path', 'static/images')
         
@@ -278,24 +323,3 @@ class HugoGenerator:
             yaml.dump(config_template, f, default_flow_style=False, indent=2)
         
         logger.info(f"Generated config template: {output_path}")
-    
-    def copy_images_to_hugo_static(self, frame_data: List[Dict], hugo_static_dir: str) -> None:
-        """Copy optimized images to Hugo static directory."""
-        import shutil
-        
-        images_dir = os.path.join(hugo_static_dir, 'images')
-        os.makedirs(images_dir, exist_ok=True)
-        
-        for frame in frame_data:
-            if not frame.get('should_include', False):
-                continue
-                
-            source_path = frame.get('optimized_path', frame['path'])
-            if not os.path.exists(source_path):
-                continue
-                
-            filename = os.path.basename(source_path)
-            dest_path = os.path.join(images_dir, filename)
-            
-            shutil.copy2(source_path, dest_path)
-            logger.info(f"Copied image to Hugo static: {dest_path}")

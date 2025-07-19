@@ -16,6 +16,4 @@ transcript_settings:
   claude_api_key: ""           # Or set ANTHROPIC_API_KEY env var
 
 hugo_settings:
-  static_path: static/images    # Hugo static images path
-  content_path: content/posts   # Hugo content path
   use_hugo_shortcodes: false   # Use {{< figure >}} shortcode instead of ![]()
