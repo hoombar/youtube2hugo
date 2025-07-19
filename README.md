@@ -1,6 +1,6 @@
-# YouTube Video to Hugo Blog Post Automation
+# YouTube to Hugo Blog Post Converter
 
-A Python application that intelligently converts YouTube videos into Hugo blog posts with strategically placed images and automatically extracted, AI-cleaned transcripts.
+Convert YouTube videos into structured Hugo blog posts with intelligent frame selection and AI-powered formatting.
 
 ## Features
 
@@ -45,25 +45,32 @@ sudo apt update && sudo apt install ffmpeg
 
 ## Quick Start
 
-### Basic Usage
+1. **Install Dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-Convert a video with automatic transcript extraction:
+2. **Create Local Configuration**
+   ```bash
+   cp config.local.yaml.example config.local.yaml
+   ```
+   
+   Edit `config.local.yaml` with your settings:
+   ```yaml
+   claude:
+     api_key: "your-anthropic-api-key-here"
+   
+   output:
+     base_folder: "/path/to/your/hugo/site"
+     posts_folder: "content/posts"
+   ```
 
-```bash
-python main.py convert --video video.mp4 --output blog-post.md
-```
-
-### With Claude API for enhanced blog posts:
-
-```bash
-export ANTHROPIC_API_KEY="your-claude-api-key"
-python main.py convert \
-  --video presentation.mp4 \
-  --output content/posts/my-presentation \
-  --title "My Amazing Presentation" \
-  --template examples/templates/tech-blog-template.md \
-  --save-transcript
-```
+3. **Convert a Video**
+   ```bash
+   python main.py convert --video video.mp4 --title "My Amazing Tutorial"
+   ```
+   
+   The post will be created at: `/path/to/your/hugo/site/content/posts/my-amazing-tutorial/`
 
 ### Using existing transcript:
 
@@ -88,105 +95,146 @@ python main.py batch-process batch-config.yaml
 
 ## Configuration
 
-### Configuration File Example
+### Local Configuration File (`config.local.yaml`)
+
+This file is excluded from git and contains sensitive settings:
 
 ```yaml
-video_processing:
-  frame_sample_interval: 15      # Extract frame every 15 seconds
-  min_face_ratio: 0.4           # Skip frames with face > 40% of screen
-  max_face_ratio: 0.2           # Prefer frames with face < 20% of screen
-  face_detection_confidence: 0.5
+# Claude API configuration
+claude:
+  api_key: "your-anthropic-api-key-here"
+  model: "claude-4-sonnet-20250514"
 
-image_settings:
-  quality: 95                   # JPEG quality (1-100)
-  max_width: 1920              # Maximum image width
-  max_height: 1080             # Maximum image height
+# Output configuration  
+output:
+  base_folder: "/Users/you/hugo-site"
+  posts_folder: "content/posts"
 
-hugo_settings:
-  use_hugo_shortcodes: false   # Use {{< figure >}} shortcode instead of ![]()
+# Template configuration (optional)
+template:
+  path: "/path/to/custom/template.md"
 
-transcript_settings:
-  context_window: 30           # Seconds of context around frames
-  whisper_model: "small"       # Whisper model: tiny, base, small, medium, large
-  claude_model: "claude-3-haiku-20240307"  # Claude model for cleanup
-  claude_api_key: "your-key"   # Or set ANTHROPIC_API_KEY env var
+# Hugo configuration
+hugo:
+  static_path: "static/images"
+  use_page_bundles: true
+  use_shortcodes: false
 
-front_matter_defaults:
-  tags: ["video", "auto-generated"]
-  categories: ["video"]
-  author: "YouTube2Hugo"
+# Processing configuration
+processing:
+  cleanup_temp_files: true
+  save_transcripts: false
+  default_whisper_model: "base"
 ```
 
-### Batch Processing Configuration
+### CLI Options
+
+```bash
+python main.py convert --help
+```
+
+Key options:
+- `--video`: Path to video file (required)
+- `--title`: Blog post title (creates kebab-case folder)
+- `--output`: Output path (optional if base_folder configured)
+- `--claude-api-key`: Override API key from config
+- `--template`: Custom blog post template
+
+## Advanced Usage
+
+### Batch Processing
+
+Create a batch configuration file:
 
 ```yaml
 settings:
-  frame_sample_interval: 20
-  min_face_ratio: 0.35
-  whisper_model: "small"
-  claude_api_key: "your-claude-api-key"
+  claude_api_key: "your-key"
+  output_base_folder: "/path/to/hugo"
 
 videos:
-  - video: "videos/presentation1.mp4"
-    output: "content/posts/presentation1.md"
-    title: "Introduction to AI"
-    save_transcript: true
-    
-  - video: "videos/tutorial.mp4"
-    transcript: "transcripts/tutorial.vtt"  # Use existing transcript
-    output: "content/posts/tutorial.md"
-    front_matter:
-      tags: ["tutorial", "programming"]
-      categories: ["education"]
-      
-  - video: "videos/lecture.mp4"
-    output: "content/posts/lecture.md"
-    title: "Advanced Machine Learning"
-    save_transcript: true
+  - video: "video1.mp4"
+    title: "First Tutorial"
+  - video: "video2.mp4" 
+    title: "Second Tutorial"
 ```
+
+Run batch processing:
+```bash
+python main.py batch-process batch_config.yaml
+```
+
+### Custom Whisper Models
+
+Choose speed vs accuracy:
+- `tiny`: Fastest, least accurate
+- `base`: Good balance (default)
+- `small`: Better accuracy
+- `medium`: High accuracy
+- `large`: Best accuracy, slowest
 
 ## How It Works
 
-### 1. Frame Selection Logic
+## Frame Selection Algorithm
 
-The application uses MediaPipe for face detection to analyze video frames:
+The algorithm intelligently selects frames by:
 
-- **Samples frames** every 10-30 seconds (configurable)
-- **Calculates face-to-screen ratio** for each frame
-- **Extracts frames where**:
-  - No face detected (full visual aids)
-  - Face occupies <20% of screen (visual aids with presenter in corner)
-  - Skips frames where face occupies >40% (talking head shots)
+1. **Content-Aware Sampling**: Analyzes transcript for visual keywords
+2. **Quality Scoring**: Prioritizes frames with screen content, devices, UI elements
+3. **Talking Head Avoidance**: Filters out frames dominated by faces
+4. **Temporal Diversity**: Ensures varied content across time
+5. **Clustered Content**: Groups rapid-fire sequences with smaller images
 
-### 2. Transcript Processing & Enhancement
+### Testing Frame Selection
 
-- **Automatic extraction** using OpenAI Whisper (multiple model sizes available)
-- **Two-pass AI enhancement** with Claude API:
-  - **Pass 1**: Fix speech recognition errors, typos, and clean up transcription artifacts
-  - **Pass 2**: Transform into engaging blog post with proper headers, sections, and structure
-- **Multi-format support**: SRT, VTT, and plain text with timestamps
-- Matches extracted frame timestamps to nearby transcript segments
-- Preserves image placement while restructuring content
+Use the testing script to optimize frame selection:
 
-### 3. Hugo Output
+```bash
+# Test current algorithm
+python test_frame_selection.py video.mp4 --mode test --duration 60
 
-- Generates proper Hugo front matter (title, date, tags, etc.)
-- Creates clean markdown with embedded images
-- **Page Bundle Structure**: Creates a folder for each post with `index.md` and images
-- **Relative Image Paths**: Images are referenced relative to the post (e.g., `image.jpg` not `/static/images/image.jpg`)
-- Supports both standard markdown and Hugo shortcodes
+# Reverse engineer from known good timestamps  
+python test_frame_selection.py video.mp4 --mode reverse --timestamps "8.0,15.0,22.0"
+```
+
+## Blog Post Formatting
+
+Claude AI transforms raw transcripts into structured blog posts with:
+
+- **Clear section headers** (Introduction, main topics, Conclusion)
+- **Engaging introductions** that hook readers
+- **Logical flow** with smooth transitions
+- **Technical accuracy** preservation
+- **Image integration** with contextual placement
+
+## Templates
+
+Create custom blog post templates with placeholders:
+
+```markdown
+---
+title: "{{title}}"
+date: "{{date}}"
+categories: ["tutorial"]
+---
+
+# {{title}}
+
+{{content}}
+
+---
+*Generated from video content*
+```
 
 ## Output Structure
 
-The tool creates Hugo page bundles, which are self-contained folders for each blog post:
+With title "My Super Interesting YouTube Video", creates:
 
 ```
-content/posts/
-└── my-video-post/           # Page bundle directory
-    ├── index.md             # Blog post content with front matter
-    ├── frame_45.0s.jpg      # Video frame at 45 seconds
-    ├── frame_120.0s.jpg     # Video frame at 120 seconds
-    └── frame_300.0s.jpg     # Video frame at 300 seconds
+/your/hugo/site/content/posts/my-super-interesting-youtube-video/
+├── index.md          # Blog post content
+├── frame_8.5s.jpg    # Selected frames
+├── frame_15.0s.jpg
+└── frame_29.0s.jpg
 ```
 
 **Benefits of Page Bundles:**
@@ -398,31 +446,20 @@ Today we'll cover machine learning basics.
 
 ## Troubleshooting
 
-### Common Issues
+### No Claude API Key
+```
+⚠️ Warning: No Claude API key found
+```
+**Solution**: Add API key to `config.local.yaml` or set `ANTHROPIC_API_KEY` environment variable
 
-1. **FFmpeg not found**
-   ```
-   Error: ffmpeg not found in PATH
-   ```
-   Solution: Install FFmpeg and ensure it's in your system PATH.
+### Missing Output Path
+```
+❌ Error: --output is required unless output.base_folder is configured
+```
+**Solution**: Either provide `--output` or configure `output.base_folder` in `config.local.yaml`
 
-2. **MediaPipe installation issues**
-   ```
-   Error: No module named 'mediapipe'
-   ```
-   Solution: Install with pip: `pip install mediapipe==0.10.7`
-
-3. **No frames extracted**
-   ```
-   Warning: No suitable frames found
-   ```
-   Solution: Lower the `min_face_ratio` threshold in config or check video content.
-
-4. **Poor image quality**
-   ```
-   Images appear blurry or low quality
-   ```
-   Solution: Increase `image_quality` and adjust `max_width`/`max_height` in config.
+### Poor Frame Selection
+**Solution**: Use the testing script to analyze and tune frame selection parameters
 
 ### Debug Mode
 

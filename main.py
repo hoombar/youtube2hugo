@@ -77,6 +77,9 @@ class YouTube2Hugo:
             if not video_info:
                 video_info = self._extract_video_info(video_path, transcript_segments)
             
+            # Adjust output path based on config
+            final_output_path = self._get_configured_output_path(output_path, title)
+            
             # Generate Hugo blog post
             logger.info("Generating Hugo blog post...")
             blog_post = self.hugo_generator.generate_blog_post(
@@ -84,9 +87,9 @@ class YouTube2Hugo:
                 transcript_segments=transcript_segments,
                 frame_data=optimized_frames,
                 video_info=video_info,
-                output_path=output_path,
+                output_path=final_output_path,
                 front_matter_data=front_matter,
-                template_path=template_path
+                template_path=self.config.get('template_path', template_path)
             )
             
             # Note: Images are now copied to page bundle directory automatically
@@ -103,6 +106,38 @@ class YouTube2Hugo:
         finally:
             # Cleanup temporary files
             self._cleanup_temp_files(temp_dir)
+    
+    def _get_configured_output_path(self, provided_output_path: str, title: str) -> str:
+        """Get the final output path based on configuration and title."""
+        # If local config specifies base folder, use it
+        base_folder = self.config.get('output_base_folder')
+        posts_folder = self.config.get('output_posts_folder', 'content/posts')
+        
+        if base_folder:
+            # Use configured base folder structure
+            full_posts_path = os.path.join(base_folder, posts_folder)
+            os.makedirs(full_posts_path, exist_ok=True)
+            
+            # Create kebab-case filename from title
+            kebab_title = self._title_to_kebab_case(title)
+            return os.path.join(full_posts_path, f"{kebab_title}.md")
+        else:
+            # Use provided output path
+            return provided_output_path
+    
+    def _title_to_kebab_case(self, title: str) -> str:
+        """Convert title to kebab-case for folder naming."""
+        import re
+        # Remove special characters and convert to lowercase
+        kebab = re.sub(r'[^a-zA-Z0-9\s-]', '', title)
+        # Replace spaces and multiple hyphens with single hyphens
+        kebab = re.sub(r'[\s-]+', '-', kebab)
+        # Convert to lowercase and strip leading/trailing hyphens
+        kebab = kebab.lower().strip('-')
+        # Ensure it's not empty
+        if not kebab:
+            kebab = 'untitled-post'
+        return kebab
     
     def _generate_title_from_path(self, video_path: str) -> str:
         """Generate a title from the video file path."""
@@ -171,10 +206,10 @@ def cli():
 @click.command()
 @click.option('--video', '-v', required=True, help='Path to video file')
 @click.option('--transcript', '-t', help='Path to existing transcript file (optional - will extract if not provided)')
-@click.option('--output', '-o', required=True, help='Output path for Hugo markdown file')
+@click.option('--output', '-o', help='Output path for Hugo markdown file (can be configured in config.local.yaml)')
 @click.option('--title', help='Blog post title (auto-generated if not provided)')
 @click.option('--config', '-c', help='Path to configuration file')
-@click.option('--claude-api-key', help='Claude API key for transcript cleanup (or set ANTHROPIC_API_KEY env var)')
+@click.option('--claude-api-key', help='Claude API key for transcript cleanup (or configure in config.local.yaml)')
 @click.option('--whisper-model', default='base', help='Whisper model size (tiny, base, small, medium, large)')
 @click.option('--save-transcript', is_flag=True, help='Save extracted transcript to .srt file')
 @click.option('--template', help='Path to blog post template file with {{placeholders}}')
@@ -189,11 +224,26 @@ def convert(video, transcript, output, title, config, claude_api_key, whisper_mo
         custom_config = Config.load_from_file(config)
         config_dict.update(custom_config)
     
-    # Add command line options to config
+    # Add command line options to config (CLI overrides local config)
     if claude_api_key:
         config_dict['claude_api_key'] = claude_api_key
     if whisper_model:
         config_dict['whisper_model'] = whisper_model
+    
+    # Check if we have Claude API key from somewhere
+    if not config_dict.get('claude_api_key') and not os.environ.get('ANTHROPIC_API_KEY'):
+        click.echo("⚠️  Warning: No Claude API key found. Set ANTHROPIC_API_KEY env var or configure in config.local.yaml", err=True)
+        click.echo("   Blog formatting will be skipped without API key.", err=True)
+    
+    # If no output path provided and no base folder configured, require output
+    if not output and not config_dict.get('output_base_folder'):
+        click.echo("❌ Error: --output is required unless output.base_folder is configured in config.local.yaml", err=True)
+        click.echo("   Create config.local.yaml or provide --output path", err=True)
+        sys.exit(1)
+    
+    # Use a default output if base folder is configured
+    if not output and config_dict.get('output_base_folder'):
+        output = 'post.md'  # Will be replaced by configured path
     
     # Load additional front matter
     front_matter_data = None

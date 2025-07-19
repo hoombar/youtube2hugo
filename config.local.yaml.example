@@ -1,0 +1,28 @@
+# Local configuration file (copy to config.local.yaml and customize)
+# This file contains sensitive settings and should NOT be committed to git
+
+# Claude API configuration
+claude:
+  api_key: "your-anthropic-api-key-here"
+  model: "claude-4-sonnet-20250514"
+
+# Output configuration
+output:
+  base_folder: "/path/to/your/hugo/site"
+  posts_folder: "content/posts"  # Relative to base_folder
+  
+# Template configuration
+template:
+  path: "/path/to/your/custom/template.md"  # Optional: custom blog post template
+  
+# Hugo configuration
+hugo:
+  static_path: "static/images"
+  use_page_bundles: true
+  use_shortcodes: false
+
+# Processing configuration
+processing:
+  cleanup_temp_files: true
+  save_transcripts: false
+  default_whisper_model: "base"

@@ -30,8 +30,8 @@ class HugoGenerator:
     ) -> str:
         """Generate a complete Hugo blog post with front matter and content in page bundle format."""
         
-        # Create page bundle directory structure
-        bundle_dir = self._create_page_bundle_structure(output_path)
+        # Create page bundle directory structure with kebab-case naming
+        bundle_dir = self._create_page_bundle_structure(output_path, title)
         
         # Copy images to bundle directory
         self._copy_images_to_bundle(frame_data, bundle_dir)
@@ -113,18 +113,37 @@ class HugoGenerator:
         
         return yaml.dump(front_matter_dict, default_flow_style=False)
     
-    def _create_page_bundle_structure(self, output_path: str) -> str:
-        """Create Hugo page bundle directory structure."""
-        # If output_path ends with .md, remove it to create the bundle directory
-        if output_path.endswith('.md'):
-            bundle_dir = output_path[:-3]
+    def _create_page_bundle_structure(self, output_path: str, title: str = None) -> str:
+        """Create Hugo page bundle directory structure with kebab-case naming."""
+        # If title is provided, create kebab-case folder name
+        if title:
+            folder_name = self._title_to_kebab_case(title)
+            base_dir = os.path.dirname(output_path)
+            bundle_dir = os.path.join(base_dir, folder_name)
         else:
-            bundle_dir = output_path
+            # Fallback to original behavior
+            if output_path.endswith('.md'):
+                bundle_dir = output_path[:-3]
+            else:
+                bundle_dir = output_path
             
         # Create the bundle directory
         os.makedirs(bundle_dir, exist_ok=True)
         
         return bundle_dir
+    
+    def _title_to_kebab_case(self, title: str) -> str:
+        """Convert title to kebab-case for folder naming."""
+        # Remove special characters and convert to lowercase
+        kebab = re.sub(r'[^a-zA-Z0-9\s-]', '', title)
+        # Replace spaces and multiple hyphens with single hyphens
+        kebab = re.sub(r'[\s-]+', '-', kebab)
+        # Convert to lowercase and strip leading/trailing hyphens
+        kebab = kebab.lower().strip('-')
+        # Ensure it's not empty
+        if not kebab:
+            kebab = 'untitled-post'
+        return kebab
     
     def _copy_images_to_bundle(self, frame_data: List[Dict], bundle_dir: str) -> None:
         """Copy optimized images to the page bundle directory."""

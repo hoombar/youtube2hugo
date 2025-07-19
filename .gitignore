@@ -1,0 +1,36 @@
+# Local configuration (sensitive settings)
+config.local.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+.env
+
+# Testing output
+frame_test_output/
+test_output/
+temp_frames/
+
+# Hugo content (generated)
+content/posts/*/
+!content/posts/.gitkeep
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
