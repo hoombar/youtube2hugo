@@ -5,6 +5,8 @@
 gemini:
   api_key: "your-google-api-key-here"
   model: "gemini-2.5-flash"
+  max_retries: 3                # Number of interactive retries for API failures
+  timeout_seconds: 60           # Timeout for individual API calls
 
 # Output configuration
 output:

@@ -59,7 +59,9 @@ class BlogFormatter:
             formatted_content = self._format_as_blog_post_strict(enhanced_content, title)
             if not self._validate_blog_structure(formatted_content):
                 logger.error("Gemini failed to format content properly after retry")
-                raise ValueError("Failed to generate properly structured blog post. Gemini API may be having issues.")
+                formatted_content = self._handle_gemini_failure_interactive(enhanced_content, title, "blog structure validation")
+                if formatted_content is None:
+                    raise ValueError("Failed to generate properly structured blog post. User chose to exit.")
         
         # Validate that images are reasonably preserved (allow for minor differences)
         formatted_images = self._extract_image_references(formatted_content)
@@ -68,7 +70,10 @@ class BlogFormatter:
         image_diff = abs(len(original_images) - len(formatted_images))
         if image_diff > 2:
             logger.warning(f"Too many images lost! Original: {len(original_images)}, Formatted: {len(formatted_images)}")
-            raise ValueError("Image preservation failed during formatting")
+            retry_content = self._handle_gemini_failure_interactive(enhanced_content, title, "image preservation")
+            if retry_content is None:
+                raise ValueError("Image preservation failed during formatting. User chose to exit.")
+            formatted_content = retry_content
         
         # Check for catastrophic content loss (more than 50% reduction indicates major problems)
         original_length = len(content_with_images.replace(' ', '').replace('\n', ''))
@@ -76,10 +81,109 @@ class BlogFormatter:
         
         if formatted_length < original_length * 0.5:
             logger.warning(f"Catastrophic content reduction detected! Original: {original_length} chars, Formatted: {formatted_length} chars")
-            raise ValueError("Content preservation failed during formatting")
+            retry_content = self._handle_gemini_failure_interactive(enhanced_content, title, "content preservation")
+            if retry_content is None:
+                raise ValueError("Content preservation failed during formatting. User chose to exit.")
+            formatted_content = retry_content
         
         logger.info(f"Successfully generated structured blog post with {len(self._extract_headers(formatted_content))} sections")
         return formatted_content
+    
+    def _handle_gemini_failure_interactive(self, content: str, title: str, failure_type: str) -> str:
+        """Handle Gemini API failures with interactive retry options."""
+        max_retries = self.config.get('gemini', {}).get('max_retries', 3)
+        retry_count = 0
+        
+        print(f"\n❌ Gemini API failed during {failure_type}")
+        print("This could be due to:")
+        print("  - Temporary API issues")
+        print("  - Rate limiting")
+        print("  - Content complexity")
+        print("  - Network connectivity issues")
+        
+        while retry_count < max_retries:
+            print(f"\n🔄 Retry attempt {retry_count + 1}/{max_retries}")
+            print("Options:")
+            print("  [Enter] - Retry with Gemini API")
+            print("  [s] - Skip Gemini formatting (use raw content)")
+            print("  [q] - Quit and exit script")
+            
+            try:
+                choice = input("Your choice: ").lower().strip()
+            except (KeyboardInterrupt, EOFError):
+                print("\n\n👋 User interrupted. Exiting...")
+                return None
+            
+            if choice == 'q':
+                print("👋 User chose to exit.")
+                return None
+            elif choice == 's':
+                print("⚠️  Skipping Gemini formatting. Using raw content.")
+                logger.warning("User chose to skip Gemini formatting")
+                return content  # Return unformatted content
+            else:
+                # Default: retry
+                print("🔄 Retrying with Gemini API...")
+                try:
+                    if failure_type == "blog structure validation":
+                        # Try different formatting approach
+                        if retry_count == 0:
+                            result = self._format_as_blog_post_strict(content, title)
+                        else:
+                            # Try with even more explicit prompting
+                            result = self._format_as_blog_post_ultra_strict(content, title)
+                    else:
+                        # For image/content preservation issues, try standard formatting
+                        result = self._format_as_blog_post(content, title)
+                    
+                    # Re-validate the result
+                    if failure_type == "blog structure validation":
+                        if self._validate_blog_structure(result):
+                            print("✅ Retry successful!")
+                            return result
+                        else:
+                            print("❌ Retry failed - structure still invalid")
+                    elif failure_type == "image preservation":
+                        formatted_images = self._extract_image_references(result)
+                        original_images = self._extract_image_references(content)
+                        image_diff = abs(len(original_images) - len(formatted_images))
+                        if image_diff <= 2:
+                            print("✅ Retry successful!")
+                            return result
+                        else:
+                            print(f"❌ Retry failed - still losing {image_diff} images")
+                    elif failure_type == "content preservation":
+                        original_length = len(content.replace(' ', '').replace('\n', ''))
+                        formatted_length = len(result.replace(' ', '').replace('\n', ''))
+                        if formatted_length >= original_length * 0.5:
+                            print("✅ Retry successful!")
+                            return result
+                        else:
+                            print(f"❌ Retry failed - content still too short ({formatted_length}/{original_length} chars)")
+                    
+                except Exception as e:
+                    print(f"❌ Retry failed with error: {e}")
+                
+                retry_count += 1
+        
+        print(f"\n❌ All {max_retries} retries failed.")
+        print("Final options:")
+        print("  [s] - Skip Gemini formatting (use raw content)")
+        print("  [q] - Quit and exit script")
+        
+        try:
+            final_choice = input("Your choice: ").lower().strip()
+        except (KeyboardInterrupt, EOFError):
+            print("\n\n👋 User interrupted. Exiting...")
+            return None
+        
+        if final_choice == 's':
+            print("⚠️  Using raw content without Gemini formatting.")
+            logger.warning("User chose to skip Gemini formatting after all retries failed")
+            return content
+        else:
+            print("👋 User chose to exit after retries failed.")
+            return None
     
     def _format_as_blog_post(self, content: str, title: str) -> str:
         """Second pass: Format content as a structured blog post."""
@@ -510,6 +614,57 @@ CRITICAL: Your output MUST start with "## Introduction" and end with "## Conclus
             return response.text.strip()
         except Exception as e:
             logger.error(f"Error in strict blog formatting: {e}")
+            raise
+    
+    def _format_as_blog_post_ultra_strict(self, content: str, title: str) -> str:
+        """Ultra-strict formatting as last resort."""
+        technical_terms_section = self._generate_technical_terms_prompt()
+        prompt = f"""FINAL ATTEMPT: Create a simple structured blog post for "{title}".
+
+IMPORTANT: DO NOT include the title "{title}" anywhere in your output.
+
+{technical_terms_section}
+
+SIMPLE REQUIREMENTS:
+1. Start with: ## Introduction
+2. Add 3-4 sections with ## headers
+3. End with: ## Conclusion
+4. Preserve ALL images ![...](filename) exactly
+5. Use simple, clear language
+
+MINIMAL STRUCTURE:
+## Introduction
+[Brief intro paragraph]
+
+## Main Content
+[Key content from transcript]
+
+![image](filename.jpg)
+
+[More content]
+
+## Key Points
+[Important points]
+
+## Conclusion
+[Brief conclusion]
+
+Transform this content:
+{content}
+
+Output a simple, well-structured blog post following the exact format above."""
+        
+        try:
+            response = self.gemini_client.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=6000,
+                    temperature=0.0,  # Zero temperature for maximum consistency
+                )
+            )
+            return response.text.strip()
+        except Exception as e:
+            logger.error(f"Error in ultra-strict blog formatting: {e}")
             raise
     
     def _extract_image_references(self, content: str) -> List[str]:
