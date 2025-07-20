@@ -6,6 +6,10 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import yaml
 import logging
+import cv2
+import numpy as np
+from PIL import Image
+import hashlib
 from blog_formatter import BlogFormatter
 
 logging.basicConfig(level=logging.INFO)
@@ -155,23 +159,31 @@ class HugoGenerator:
         """Copy optimized images to the page bundle directory."""
         import shutil
         
-        for frame in frame_data:
-            if not frame.get('should_include', False):
-                continue
-                
+        frames_to_copy = [f for f in frame_data if f.get('should_include', False)]
+        logger.info(f"🖼️  IMAGE COPYING: {len(frames_to_copy)} frames marked for copying out of {len(frame_data)} total")
+        
+        copied_count = 0
+        for frame in frames_to_copy:
             source_path = frame.get('optimized_path', frame['path'])
             if not os.path.exists(source_path):
+                logger.warning(f"⚠️  Source image not found: {source_path}")
                 continue
                 
             filename = os.path.basename(source_path)
             dest_path = os.path.join(bundle_dir, filename)
             
-            shutil.copy2(source_path, dest_path)
-            
-            # Update frame data with new bundle-relative path
-            frame['bundle_path'] = filename
-            
-            logger.info(f"Copied image to bundle: {dest_path}")
+            try:
+                shutil.copy2(source_path, dest_path)
+                
+                # Update frame data with new bundle-relative path
+                frame['bundle_path'] = filename
+                copied_count += 1
+                
+                logger.info(f"✅ Copied image to bundle: {filename}")
+            except Exception as e:
+                logger.error(f"❌ Failed to copy {source_path}: {e}")
+        
+        logger.info(f"📊 IMAGE COPYING SUMMARY: {copied_count} images copied to bundle directory")
     
     def _generate_content_with_images(
         self, 
@@ -220,32 +232,24 @@ class HugoGenerator:
             )
             
             if relevant_frames:
-                # Group clustered images together
-                clustered_images = []
-                regular_images = []
-                
-                for frame in relevant_frames:
-                    if frame.get('is_clustered', False):
-                        clustered_images.append(frame)
-                    else:
-                        regular_images.append(frame)
-                
-                # Add regular images
-                for frame in regular_images:
-                    image_markdown = self._generate_image_markdown(frame, paragraph)
+                # Display all images in a grid layout if multiple, or single if just one
+                if len(relevant_frames) == 1:
+                    # Single image - use standard markdown
+                    frame = relevant_frames[0]
+                    image_markdown = self._generate_single_image_markdown(frame, paragraph)
                     content_parts.append(image_markdown)
                     used_frames.add(frame['timestamp'])
                     total_frames_placed += 1
-                    logger.info(f"  🖼️  PLACED frame {frame['timestamp']:.1f}s in paragraph {i+1}")
-                
-                # Add clustered images as a group
-                if clustered_images:
-                    clustered_markdown = self._generate_clustered_images_markdown(clustered_images, paragraph)
-                    content_parts.append(clustered_markdown)
-                    for frame in clustered_images:
+                    logger.info(f"  🖼️  PLACED single frame {frame['timestamp']:.1f}s in paragraph {i+1}")
+                else:
+                    # Multiple images - use grid layout
+                    grid_markdown = self._generate_image_grid_markdown(relevant_frames, paragraph)
+                    content_parts.append(grid_markdown)
+                    for frame in relevant_frames:
                         used_frames.add(frame['timestamp'])
                         total_frames_placed += 1
-                        logger.info(f"  🖼️  PLACED clustered frame {frame['timestamp']:.1f}s in paragraph {i+1}")
+                        logger.info(f"  🖼️  PLACED grid frame {frame['timestamp']:.1f}s in paragraph {i+1}")
+                    logger.info(f"  📐 GRID: {len(relevant_frames)} images in grid layout for paragraph {i+1}")
         
         logger.info(f"📊 CONTENT GENERATION SUMMARY: {total_frames_placed} frames placed in {len(paragraphs)} paragraphs")
         unused_frames = len(sorted_frames) - total_frames_placed
@@ -406,7 +410,102 @@ class HugoGenerator:
             clustered_frames.sort(key=lambda x: x['score'], reverse=True)
             result.extend(clustered_frames[:3])
         
+        # Apply similarity filtering to remove duplicate-looking images
+        if len(result) > 1:
+            logger.debug(f"  🔍 SIMILARITY CHECK: Filtering {len(result)} frames for duplicates...")
+            similarity_threshold = self.config.get('image_similarity_threshold', 0.15)
+            result = self._remove_similar_images(result, similarity_threshold)
+        
         return result
+    
+    def _calculate_image_hash(self, image_path: str) -> str:
+        """Calculate perceptual hash for image similarity detection."""
+        try:
+            # Load image and convert to grayscale
+            image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+            if image is None:
+                return ""
+            
+            # Resize to standard size for comparison
+            resized = cv2.resize(image, (16, 16), interpolation=cv2.INTER_AREA)
+            
+            # Calculate average pixel value
+            avg = resized.mean()
+            
+            # Create binary hash based on pixel values vs average
+            hash_bits = []
+            for row in resized:
+                for pixel in row:
+                    hash_bits.append('1' if pixel > avg else '0')
+            
+            # Convert to hex string
+            binary_string = ''.join(hash_bits)
+            hash_value = hex(int(binary_string, 2))[2:]
+            
+            return hash_value
+            
+        except Exception as e:
+            logger.warning(f"Could not calculate hash for {image_path}: {e}")
+            return ""
+    
+    def _calculate_hash_similarity(self, hash1: str, hash2: str) -> float:
+        """Calculate similarity between two perceptual hashes (0.0 = identical, 1.0 = completely different)."""
+        if not hash1 or not hash2 or len(hash1) != len(hash2):
+            return 1.0
+        
+        # Count different bits
+        different_bits = sum(c1 != c2 for c1, c2 in zip(hash1, hash2))
+        
+        # Return normalized difference (0.0 = identical, 1.0 = completely different)
+        return different_bits / len(hash1)
+    
+    def _remove_similar_images(self, frames: List[Dict], similarity_threshold: float = 0.15) -> List[Dict]:
+        """Remove images that are too similar to other images in the same set."""
+        if len(frames) <= 1:
+            return frames
+        
+        # Calculate hashes for all frames
+        frame_hashes = []
+        for frame in frames:
+            image_hash = self._calculate_image_hash(frame['path'])
+            frame_hashes.append({
+                'frame': frame,
+                'hash': image_hash,
+                'kept': True
+            })
+        
+        # Compare each frame with all others and mark similar ones for removal
+        for i, frame_data in enumerate(frame_hashes):
+            if not frame_data['kept']:
+                continue
+                
+            for j, other_frame_data in enumerate(frame_hashes[i+1:], i+1):
+                if not other_frame_data['kept']:
+                    continue
+                
+                similarity = self._calculate_hash_similarity(frame_data['hash'], other_frame_data['hash'])
+                
+                if similarity <= similarity_threshold:
+                    # Keep the higher scoring frame, remove the lower scoring one
+                    frame1_score = frame_data['frame'].get('score', 0)
+                    frame2_score = other_frame_data['frame'].get('score', 0)
+                    
+                    if frame1_score >= frame2_score:
+                        other_frame_data['kept'] = False
+                        logger.debug(f"  🗑️  REMOVED similar frame {other_frame_data['frame']['timestamp']:.1f}s (similarity={similarity:.3f}, score={frame2_score:.1f} < {frame1_score:.1f})")
+                    else:
+                        frame_data['kept'] = False
+                        logger.debug(f"  🗑️  REMOVED similar frame {frame_data['frame']['timestamp']:.1f}s (similarity={similarity:.3f}, score={frame1_score:.1f} < {frame2_score:.1f})")
+                        break  # No need to check more if this frame is removed
+        
+        # Return only the frames that should be kept
+        filtered_frames = [fd['frame'] for fd in frame_hashes if fd['kept']]
+        
+        removed_count = len(frames) - len(filtered_frames)
+        if removed_count > 0:
+            logger.debug(f"  🎯 SIMILARITY FILTER: Removed {removed_count} similar images, kept {len(filtered_frames)}")
+        
+        return filtered_frames
     
     def _generate_clustered_images_markdown(self, frames: List[Dict], paragraph: List[Dict]) -> str:
         """Generate markdown for clustered images displayed side by side."""
@@ -427,7 +526,7 @@ class HugoGenerator:
         else:
             return f'<div class="image-cluster">\n{"".join(image_tags)}\n</div>'
     
-    def _generate_image_markdown(self, frame: Dict, paragraph: List[Dict]) -> str:
+    def _generate_single_image_markdown(self, frame: Dict, paragraph: List[Dict]) -> str:
         """Generate markdown for an image with appropriate alt text."""
         
         # Generate descriptive alt text based on context
@@ -450,6 +549,148 @@ class HugoGenerator:
                 return f'<img src="{image_path}" alt="{alt_text}" width="400" style="display: inline-block; margin: 5px;">'
             else:
                 return f'![{alt_text}]({image_path})'
+    
+    def _generate_image_grid_markdown(self, frames: List[Dict], paragraph: List[Dict]) -> str:
+        """Generate markdown for multiple images displayed in a responsive grid."""
+        if not frames:
+            return ""
+        
+        if len(frames) == 1:
+            return self._generate_single_image_markdown(frames[0], paragraph)
+        
+        # Get grid configuration options
+        gap_size = self.config.get('image_grid', {}).get('gap_size', '10px')
+        show_timestamps = self.config.get('image_grid', {}).get('show_timestamps', True)
+        border_radius = self.config.get('image_grid', {}).get('border_radius', '4px')
+        max_columns = self.config.get('image_grid', {}).get('max_columns', 3)
+        include_css_reset = self.config.get('image_grid', {}).get('include_css_reset', True)
+        use_flexbox_fallback = self.config.get('image_grid', {}).get('use_flexbox_fallback', False)
+        
+        # Determine grid layout based on number of images
+        num_images = len(frames)
+        
+        if use_flexbox_fallback:
+            # Flexbox fallback for problematic themes
+            grid_class = f"image-flex-{num_images}"
+            if num_images == 2:
+                grid_style = f"display: flex; flex-wrap: wrap; gap: {gap_size}; margin: 20px 0;"
+                img_width = "calc(50% - 5px)"
+            elif num_images == 3:
+                grid_style = f"display: flex; flex-wrap: wrap; gap: {gap_size}; margin: 20px 0;"
+                img_width = "calc(33.333% - 7px)"
+            elif num_images == 4:
+                grid_style = f"display: flex; flex-wrap: wrap; gap: {gap_size}; margin: 20px 0;"
+                img_width = "calc(50% - 5px)"
+            else:
+                grid_style = f"display: flex; flex-wrap: wrap; gap: {gap_size}; margin: 20px 0;"
+                img_width = "calc(33.333% - 7px)"
+        else:
+            # Standard CSS Grid
+            if num_images == 2:
+                # 1 row, 2 columns
+                grid_class = "image-grid-2"
+                grid_style = f"display: grid; grid-template-columns: 1fr 1fr; gap: {gap_size}; margin: 20px 0;"
+            elif num_images == 3:
+                # 1 row, 3 columns
+                grid_class = "image-grid-3"
+                grid_style = f"display: grid; grid-template-columns: 1fr 1fr 1fr; gap: {gap_size}; margin: 20px 0;"
+            elif num_images == 4:
+                # 2 rows, 2 columns
+                grid_class = "image-grid-4"
+                grid_style = f"display: grid; grid-template-columns: 1fr 1fr; gap: {gap_size}; margin: 20px 0;"
+            else:
+                # For 5+ images, use a flexible grid with configurable max columns
+                grid_class = "image-grid-flex"
+                grid_style = f"display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: {gap_size}; margin: 20px 0;"
+            img_width = "100%"
+        
+        # Generate individual image elements
+        image_elements = []
+        for frame in frames:
+            alt_text = self._generate_alt_text(frame, paragraph)
+            image_path = self._get_hugo_image_path(frame)
+            timestamp = frame['timestamp']
+            
+            if self.config.get('use_hugo_shortcodes', False):
+                # Hugo shortcode with responsive sizing
+                if show_timestamps:
+                    image_elements.append(
+                        f'{{{{< figure src="{image_path}" alt="{alt_text}" class="grid-image" caption="{timestamp:.1f}s" >}}}}'
+                    )
+                else:
+                    image_elements.append(
+                        f'{{{{< figure src="{image_path}" alt="{alt_text}" class="grid-image" >}}}}'
+                    )
+            else:
+                # HTML img tag with defensive styling against theme interference
+                img_style = f"width: {img_width} !important; height: auto !important; object-fit: cover; border-radius: {border_radius}; display: block !important; max-width: {img_width} !important; margin: 0 !important; padding: 0 !important;"
+                caption_style = "font-size: 0.8em !important; color: #666 !important; text-align: center !important; margin-top: 5px !important; margin-bottom: 0 !important; padding: 0 !important;"
+                
+                if show_timestamps:
+                    image_elements.append(f'''<div class="grid-item">
+    <img src="{image_path}" alt="{alt_text}" style="{img_style}">
+    <div style="{caption_style}">{timestamp:.1f}s</div>
+</div>''')
+                else:
+                    image_elements.append(f'''<div class="grid-item">
+    <img src="{image_path}" alt="{alt_text}" style="{img_style}">
+</div>''')
+        
+        # Combine into grid container
+        if self.config.get('use_hugo_shortcodes', False):
+            # For Hugo shortcodes, create a custom grid shortcode
+            shortcode_params = f'class="{grid_class}" columns="{num_images}" gap="{gap_size}"'
+            
+            # Create individual image shortcodes
+            image_shortcodes = []
+            for frame in frames:
+                alt_text = self._generate_alt_text(frame, paragraph)
+                image_path = self._get_hugo_image_path(frame)
+                timestamp = frame['timestamp']
+                
+                if show_timestamps:
+                    image_shortcodes.append(f'{{{{< grid-image src="{image_path}" alt="{alt_text}" caption="{timestamp:.1f}s" >}}}}')
+                else:
+                    image_shortcodes.append(f'{{{{< grid-image src="{image_path}" alt="{alt_text}" >}}}}')
+            
+            return f'''{{{{< image-grid {shortcode_params} >}}}}
+{chr(10).join(image_shortcodes)}
+{{{{< /image-grid >}}}}'''
+        else:
+            # For HTML, include all styling inline for maximum compatibility with defensive CSS
+            container_style = grid_style + " max-width: 100% !important; overflow: hidden !important; box-sizing: border-box !important; clear: both !important;"
+            
+            # Optional CSS reset to override theme interference
+            css_reset = ""
+            if include_css_reset:
+                css_reset = f'''<style>
+.{grid_class} {{
+    display: grid !important;
+    box-sizing: border-box !important;
+    margin: 20px 0 !important;
+    padding: 0 !important;
+}}
+.{grid_class} .grid-item {{
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+}}
+.{grid_class} .grid-item img {{
+    width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    object-fit: cover !important;
+}}
+</style>
+'''
+            
+            return f'''{css_reset}<div class="{grid_class}" style="{container_style}">
+{chr(10).join(image_elements)}
+</div>'''
     
     def _generate_alt_text(self, frame: Dict, paragraph: List[Dict]) -> str:
         """Generate descriptive alt text for an image."""
@@ -532,6 +773,7 @@ class HugoGenerator:
         
         # Extract all image references from the blog content
         referenced_images = self._extract_referenced_images(blog_content)
+        logger.info(f"🧹 CLEANUP: Found {len(referenced_images)} referenced images in blog content")
         
         # Find all image files in the bundle directory
         image_patterns = ['*.jpg', '*.jpeg', '*.png', '*.gif', '*.webp']
@@ -542,12 +784,19 @@ class HugoGenerator:
         
         # Get just the filenames for comparison
         all_image_files = [os.path.basename(img) for img in all_images]
+        logger.info(f"🧹 CLEANUP: Found {len(all_image_files)} image files in bundle directory: {all_image_files}")
         
         # Find unused images
         unused_images = []
         for image_file in all_image_files:
             if not any(image_file in ref for ref in referenced_images):
                 unused_images.append(image_file)
+                logger.debug(f"  ❌ UNUSED: {image_file} not found in references")
+            else:
+                logger.debug(f"  ✅ USED: {image_file} found in references")
+        
+        if unused_images:
+            logger.warning(f"🧹 CLEANUP: {len(unused_images)} unused images will be removed: {unused_images}")
         
         # Remove unused images
         removed_count = 0
@@ -561,29 +810,46 @@ class HugoGenerator:
                 os.remove(image_path)
                 removed_count += 1
                 total_size_saved += file_size
-                logger.info(f"Removed unused image: {unused_image}")
+                logger.info(f"🗑️  Removed unused image: {unused_image}")
             except OSError as e:
                 logger.warning(f"Could not remove {unused_image}: {e}")
         
         if removed_count > 0:
             size_mb = total_size_saved / (1024 * 1024)
-            logger.info(f"Cleanup complete: Removed {removed_count} unused images, saved {size_mb:.2f} MB")
+            logger.info(f"🧹 Cleanup complete: Removed {removed_count} unused images, saved {size_mb:.2f} MB")
         else:
-            logger.info("No unused images found - all images are referenced in the blog post")
+            logger.info("✅ No unused images found - all images are referenced in the blog post")
     
     def _extract_referenced_images(self, content: str) -> List[str]:
         """Extract all image filenames referenced in markdown content."""
         import re
         
-        # Match ![alt text](filename) pattern and extract just the filename
-        image_pattern = r'!\[.*?\]\(([^)]+)\)'
-        matches = re.findall(image_pattern, content)
+        referenced_files = []
+        
+        # Match traditional markdown ![alt text](filename) pattern
+        markdown_pattern = r'!\[.*?\]\(([^)]+)\)'
+        markdown_matches = re.findall(markdown_pattern, content)
+        
+        # Match HTML <img src="filename"> pattern (used in grids)
+        html_pattern = r'<img[^>]+src=["\']([^"\']+)["\'][^>]*>'
+        html_matches = re.findall(html_pattern, content)
+        
+        # Match Hugo shortcode {{< figure src="filename" >}} pattern
+        hugo_pattern = r'\{\{<\s*figure\s+src=["\']([^"\']+)["\']'
+        hugo_matches = re.findall(hugo_pattern, content)
+        
+        # Combine all matches
+        all_matches = markdown_matches + html_matches + hugo_matches
         
         # Extract just the filename from full paths
-        referenced_files = []
-        for match in matches:
+        for match in all_matches:
             # Handle both relative paths and just filenames
             filename = os.path.basename(match)
             referenced_files.append(filename)
+        
+        # Remove duplicates
+        referenced_files = list(set(referenced_files))
+        
+        logger.debug(f"🔍 IMAGE REFERENCES: Found {len(referenced_files)} unique image references: {referenced_files}")
         
         return referenced_files

@@ -19,14 +19,33 @@ template:
 hugo:
   static_path: "static/images"
   use_page_bundles: true
-  use_shortcodes: false
+  use_shortcodes: false  # Set to true if you see "raw HTML omitted" in your blog
   date_offset_days: 1  # Days ago to set post date (avoids Hugo future date issues)
+  
+# IMPORTANT: If you see "raw HTML omitted" in your blog posts, you have two options:
+# Option 1 (Recommended): Enable HTML rendering in your Hugo config.yaml:
+#   markup:
+#     goldmark:
+#       renderer:
+#         unsafe: true
+# 
+# Option 2: Set use_shortcodes: true above and create Hugo shortcodes (see README)
+  
+# Image grid layout configuration
+image_grid:
+  show_timestamps: true      # Show timestamp captions on grid images
+  gap_size: "10px"          # Space between grid images
+  border_radius: "4px"      # Rounded corners for images
+  max_columns: 3            # Maximum columns in flexible grid layouts
+  include_css_reset: true   # Include CSS reset to override theme interference
+  use_flexbox_fallback: false  # Use flexbox instead of CSS Grid (for problematic themes)
 
 # Processing configuration
 processing:
   cleanup_temp_files: true
   save_transcripts: false
   default_whisper_model: "base"
+  image_similarity_threshold: 0.15  # Remove images more than 15% similar (0.0=identical, 1.0=completely different)
   
 # Date configuration
 date:

@@ -1,0 +1,19 @@
+{{/* Image Grid Shortcode for YouTube2Hugo */}}
+{{/* Usage: {{< image-grid class="image-grid-4" columns="4" gap="10px" >}} */}}
+{{ $class := .Get "class" | default "image-grid" }}
+{{ $columns := .Get "columns" | default "2" }}
+{{ $gap := .Get "gap" | default "10px" }}
+
+{{ if eq $columns "2" }}
+  {{ $gridCols := "1fr 1fr" }}
+{{ else if eq $columns "3" }}
+  {{ $gridCols := "1fr 1fr 1fr" }}
+{{ else if eq $columns "4" }}
+  {{ $gridCols := "1fr 1fr" }}
+{{ else }}
+  {{ $gridCols := "repeat(auto-fit, minmax(300px, 1fr))" }}
+{{ end }}
+
+<div class="{{ $class }}" style="display: grid; grid-template-columns: {{ $gridCols }}; gap: {{ $gap }}; margin: 20px 0; max-width: 100%; overflow: hidden;">
+{{ .Inner }}
+</div>

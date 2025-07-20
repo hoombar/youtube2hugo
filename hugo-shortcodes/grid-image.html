@@ -1,0 +1,12 @@
+{{/* Grid Image Shortcode for YouTube2Hugo */}}
+{{/* Usage: {{< grid-image src="image.jpg" alt="Description" caption="12.0s" >}} */}}
+{{ $src := .Get "src" }}
+{{ $alt := .Get "alt" | default "Video frame" }}
+{{ $caption := .Get "caption" }}
+
+<div class="grid-item" style="box-sizing: border-box; margin: 0; padding: 0;">
+  <img src="{{ $src }}" alt="{{ $alt }}" style="width: 100%; height: auto; display: block; margin: 0; padding: 0; object-fit: cover; border-radius: 4px;">
+  {{ if $caption }}
+  <div style="font-size: 0.8em; color: #666; text-align: center; margin-top: 5px; margin-bottom: 0;">{{ $caption }}</div>
+  {{ end }}
+</div>
