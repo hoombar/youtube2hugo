@@ -116,6 +116,10 @@ class Config:
             if 'hugo' in local_config and 'date_offset_days' in local_config['hugo']:
                 flattened['date_offset_days'] = local_config['hugo']['date_offset_days']
             
+            # Handle technical terms configuration
+            if 'technical_terms' in local_config:
+                flattened['technical_terms'] = local_config['technical_terms']
+            
             return flattened
             
         except Exception as e:

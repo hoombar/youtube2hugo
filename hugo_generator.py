@@ -185,15 +185,31 @@ class HugoGenerator:
         used_frames = set()
         
         # Sort frame data by timestamp
-        sorted_frames = sorted(
-            [f for f in frame_data if f.get('should_include', False)],
-            key=lambda x: x['timestamp']
-        )
+        logger.info(f"🖼️  CONTENT GENERATION: Processing {len(frame_data)} frames...")
+        
+        # Debug logging for should_include filtering
+        frames_with_include = [f for f in frame_data if f.get('should_include', False)]
+        frames_without_include = [f for f in frame_data if not f.get('should_include', False)]
+        
+        if frames_without_include:
+            logger.warning(f"⚠️  FILTERED OUT {len(frames_without_include)} frames missing should_include=True:")
+            for frame in frames_without_include[:5]:  # Show first 5
+                timestamp = frame.get('timestamp', 'unknown')
+                should_include = frame.get('should_include', 'missing')
+                logger.warning(f"    - {timestamp}s: should_include={should_include}")
+        
+        sorted_frames = sorted(frames_with_include, key=lambda x: x['timestamp'])
+        logger.info(f"📍 CONTENT GENERATION: Using {len(sorted_frames)} frames with should_include=True")
         
         # Group transcript segments into paragraphs
         paragraphs = self._group_segments_into_paragraphs(transcript_segments)
+        logger.info(f"📝 CONTENT STRUCTURE: {len(paragraphs)} paragraphs from transcript")
         
-        for paragraph in paragraphs:
+        total_frames_placed = 0
+        for i, paragraph in enumerate(paragraphs):
+            paragraph_start = paragraph[0]['start_time']
+            paragraph_end = paragraph[-1]['end_time']
+            logger.info(f"📝 PARAGRAPH {i+1}: {paragraph_start:.1f}s-{paragraph_end:.1f}s")
             # Add paragraph text
             paragraph_text = self._format_paragraph_text(paragraph)
             content_parts.append(paragraph_text)
@@ -219,6 +235,8 @@ class HugoGenerator:
                     image_markdown = self._generate_image_markdown(frame, paragraph)
                     content_parts.append(image_markdown)
                     used_frames.add(frame['timestamp'])
+                    total_frames_placed += 1
+                    logger.info(f"  🖼️  PLACED frame {frame['timestamp']:.1f}s in paragraph {i+1}")
                 
                 # Add clustered images as a group
                 if clustered_images:
@@ -226,6 +244,13 @@ class HugoGenerator:
                     content_parts.append(clustered_markdown)
                     for frame in clustered_images:
                         used_frames.add(frame['timestamp'])
+                        total_frames_placed += 1
+                        logger.info(f"  🖼️  PLACED clustered frame {frame['timestamp']:.1f}s in paragraph {i+1}")
+        
+        logger.info(f"📊 CONTENT GENERATION SUMMARY: {total_frames_placed} frames placed in {len(paragraphs)} paragraphs")
+        unused_frames = len(sorted_frames) - total_frames_placed
+        if unused_frames > 0:
+            logger.warning(f"⚠️  {unused_frames} frames were not placed (no matching transcript timing)")
         
         return '\n\n'.join(content_parts)
     
@@ -309,8 +334,12 @@ class HugoGenerator:
         paragraph_start = paragraph[0]['start_time']
         paragraph_end = paragraph[-1]['end_time']
         
+        logger.debug(f"🔍 FINDING frames for paragraph {paragraph_start:.1f}s-{paragraph_end:.1f}s ({len(sorted_frames)} total frames available)")
+        
         # Find frames that overlap with this paragraph timeframe
         candidate_frames = []
+        excluded_frames = []
+        
         for frame in sorted_frames:
             if frame['timestamp'] in used_frames:
                 continue
@@ -318,9 +347,20 @@ class HugoGenerator:
             # Include frames within the paragraph timeframe
             if paragraph_start <= frame['timestamp'] <= paragraph_end:
                 candidate_frames.append(frame)
-            # Also include frames slightly before/after (context)
-            elif abs(frame['timestamp'] - paragraph_start) <= 10 or abs(frame['timestamp'] - paragraph_end) <= 10:
+                logger.debug(f"  ✅ INCLUDED {frame['timestamp']:.1f}s (within paragraph)")
+            # Also include frames slightly before/after (context) - smaller window
+            elif abs(frame['timestamp'] - paragraph_start) <= 5 or abs(frame['timestamp'] - paragraph_end) <= 5:
                 candidate_frames.append(frame)
+                logger.debug(f"  ✅ INCLUDED {frame['timestamp']:.1f}s (within 5s context)")
+            else:
+                excluded_frames.append(frame['timestamp'])
+        
+        if excluded_frames and len(excluded_frames) <= 10:  # Don't spam if too many
+            logger.debug(f"  ❌ EXCLUDED frames: {[f'{ts:.1f}s' for ts in excluded_frames[:10]]}")
+        elif excluded_frames:
+            logger.debug(f"  ❌ EXCLUDED {len(excluded_frames)} frames (timestamps don't match paragraph)")
+        
+        logger.debug(f"🎯 PARAGRAPH {paragraph_start:.1f}s-{paragraph_end:.1f}s: {len(candidate_frames)} relevant frames found")
         
         if not candidate_frames:
             return []
@@ -332,10 +372,33 @@ class HugoGenerator:
         
         result = []
         
-        # Add best regular frame
+        # Add regular frames - allow multiple for rapid sequences with good scores
         if regular_frames:
-            best_regular = min(regular_frames, key=lambda x: x['face_ratio'])
-            result.append(best_regular)
+            # Sort by score (highest first)
+            regular_frames.sort(key=lambda x: x['score'], reverse=True)
+            
+            # If there are multiple high-scoring frames, include more of them
+            high_score_frames = [f for f in regular_frames if f['score'] >= 500]  # High-quality content
+            medium_score_frames = [f for f in regular_frames if 200 <= f['score'] < 500]
+            
+            if len(high_score_frames) >= 3:
+                # Many high-quality frames - take up to 4 best ones
+                result.extend(high_score_frames[:4])
+                logger.debug(f"  📸 MULTIPLE high-quality frames: added {len(high_score_frames[:4])} frames")
+            elif len(high_score_frames) >= 2:
+                # Some high-quality frames - take up to 3
+                result.extend(high_score_frames[:3])
+                logger.debug(f"  📸 MULTIPLE high-quality frames: added {len(high_score_frames[:3])} frames")
+            elif len(high_score_frames) == 1 and len(medium_score_frames) >= 2:
+                # 1 high + multiple medium - take 1 high + 2 medium
+                result.extend(high_score_frames[:1])
+                result.extend(medium_score_frames[:2])
+                logger.debug(f"  📸 MIXED quality frames: added 1 high + 2 medium frames")
+            else:
+                # Default: take single best frame (by lowest face ratio)
+                best_regular = min(regular_frames, key=lambda x: x['face_ratio'])
+                result.append(best_regular)
+                logger.debug(f"  📸 SINGLE best frame: {best_regular['timestamp']:.1f}s (score={best_regular['score']:.1f})")
         
         # Add clustered frames (up to 3)
         if clustered_frames:

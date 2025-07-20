@@ -16,6 +16,9 @@ class BlogFormatter:
         self.config = config
         self.gemini_client = None
         
+        # Load technical terms for correction
+        self.technical_terms = self._load_technical_terms()
+        
         # Initialize Gemini client if API key is provided
         api_key = config.get('gemini_api_key') or os.getenv('GOOGLE_API_KEY')
         if api_key:
@@ -106,9 +109,14 @@ class BlogFormatter:
     
     def _get_blog_formatting_prompt(self, title: str) -> str:
         """Generate the prompt for Gemini to format content as a blog post."""
+        technical_terms_section = self._generate_technical_terms_prompt()
         return f"""Transform this transcript-based content into a well-structured, engaging blog post for "{title}".
 
 IMPORTANT: DO NOT include the title "{title}" anywhere in your output - it will be added separately in the template.
+
+{technical_terms_section}
+
+Pay special attention to company names, product names, and technical protocols that are commonly mispronounced or misheard in speech-to-text.
 
 CRITICAL PRESERVATION REQUIREMENTS:
 1. **PRESERVE EVERY SINGLE IMAGE**: All ![...](filename.jpg) references must remain EXACTLY as they are
@@ -243,6 +251,7 @@ Return the complete formatted blog post content (no front matter). Must contain 
     def _cleanup_transcript_text(self, text: str) -> str:
         """First pass: Clean up transcript text for basic errors."""
         
+        technical_terms_section = self._generate_technical_terms_prompt()
         cleanup_prompt = f"""Please clean up this video transcript by fixing obvious errors from speech recognition. This is the FIRST PASS - focus only on basic cleanup:
 
 1. Fix obvious typos and misheard words
@@ -251,12 +260,14 @@ Return the complete formatted blog post content (no front matter). Must contain 
 4. Fix capitalization issues
 5. Remove filler words and speech artifacts like "um", "uh", repeated words
 
+{technical_terms_section}
+
 DO NOT:
 - Change the overall meaning or tone
 - Rephrase sentences significantly  
 - Add new content or insights
 - Remove substantive content
-- Change technical terms unless obviously wrong
+- Change technical terms unless obviously wrong (use the correction list above)
 - Add structure or formatting (that comes later)
 
 This transcript will be further processed, so keep it conversational and maintain the original flow.
@@ -365,6 +376,52 @@ Return only the cleaned transcript text:
         
         return enhanced_content
     
+    def _load_technical_terms(self) -> Dict[str, str]:
+        """Load technical terms from configuration with default Home Assistant terms."""
+        # Default Home Assistant and smart home terms
+        default_terms = {
+            'Home Assistant': ['home assistant', 'homeassistant', 'Home-Assistant', 'home-assistant'],
+            'Nabu Casa': ['Nabakaza', 'Naba Casa', 'Nava Casa', 'Nabu-Casa', 'nabucasa'],
+            'ZigBee': ['Zigby', 'Zigbee', 'Zig Bee', 'Zig-Bee', 'zigby'],
+            'Z-Wave': ['Z Wave', 'Zwave', 'Z-way', 'z-wave', 'zwave'],
+            'Node-RED': ['Node Red', 'NodeRed', 'Node-red', 'node-red', 'nodred'],
+            'MQTT': ['MQ TT', 'EMQTT', 'M QTT', 'mqtt', 'Mqtt'],
+            'ESPHome': ['ESP Home', 'ESP-Home', 'Esp Home', 'esp-home', 'esphome'],
+            'Frigate': ['Friggit', 'Friget', 'Frigit', 'frigate'],
+            'Hass.io': ['Hassio', 'Has.io', 'Hass io', 'hassio', 'hass-io'],
+            'Add-on': ['Addon', 'Add on', 'ad-on', 'addon'],
+            'Supervisor': ['supervisor'],
+            'HACS': ['Hax', 'HACs', 'H-A-C-S', 'hacs'],
+            'Lovelace': ['Love Lace', 'Lovelase', 'Love-lace', 'lovelace'],
+            'Zigbee2MQTT': ['Zigbee to MQTT', 'Zigbee 2 MQTT', 'Zigby2MQTT', 'zigbee2mqtt'],
+            'ConBee': ['Con Bee', 'Conby', 'ConBy', 'con-bee', 'conbee'],
+            'deCONZ': ['de-CONZ', 'deconz', 'De Conz', 'de-conz'],
+            'InfluxDB': ['Influx DB', 'influxdb', 'Influx-DB', 'influx-db'],
+            'Grafana': ['Graphana', 'Grafanna', 'Graf-ana', 'grafana'],
+            'Prometheus': ['Promethius', 'Prometheous', 'prometheus'],
+            'Docker': ['docker'],
+            'Portainer': ['Port-ainer', 'Portaner', 'Port Ainer', 'portainer']
+        }
+        
+        # Load additional terms from config if available
+        config_terms = self.config.get('technical_terms', {})
+        
+        # Merge config terms with defaults
+        all_terms = default_terms.copy()
+        all_terms.update(config_terms)
+        
+        return all_terms
+    
+    def _generate_technical_terms_prompt(self) -> str:
+        """Generate the technical terms correction section for prompts."""
+        terms_text = "CRITICAL TECHNICAL TERM CORRECTIONS:\nPay special attention to correcting these commonly misheard technical terms:\n"
+        
+        for correct_term, incorrect_variants in self.technical_terms.items():
+            variants_str = ', '.join([f'"{variant}"' for variant in incorrect_variants])
+            terms_text += f"- {correct_term} (not {variants_str})\n"
+        
+        return terms_text
+    
     def _validate_blog_structure(self, content: str) -> bool:
         """Validate that content has proper blog structure with sections."""
         headers = self._extract_headers(content)
@@ -403,9 +460,12 @@ Return only the cleaned transcript text:
     
     def _format_as_blog_post_strict(self, content: str, title: str) -> str:
         """Strict formatting with even stronger requirements."""
+        technical_terms_section = self._generate_technical_terms_prompt()
         prompt = f"""URGENT: Transform this transcript into a properly structured blog post for "{title}".
 
 IMPORTANT: DO NOT include the title "{title}" anywhere in your output - it will be added separately.
+
+{technical_terms_section}
 
 THIS IS YOUR SECOND ATTEMPT. THE FIRST ATTEMPT FAILED VALIDATION.
 

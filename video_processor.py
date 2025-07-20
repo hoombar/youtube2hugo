@@ -35,45 +35,81 @@ class VideoProcessor:
         # Get candidate timestamps based on content and intervals
         candidate_timestamps = self._get_intelligent_timestamps(duration, transcript_segments)
         
-        # Add focused dense sampling only where needed (first 30s for rapid sequences)
-        dense_sampling_end = min(30, duration * 0.1)  # Only first 30s
-        dense_timestamps = list(np.arange(5, dense_sampling_end, 2.0))  # Every 2 seconds starting at 5s
+        # Add focused dense sampling for rapid sequences 
+        # Multi-tier dense sampling for better rapid sequence capture
+        dense_timestamps = []
+        
+        # Ultra-dense for first 30 seconds (every 0.5s for better coverage)
+        if duration > 10:
+            dense_timestamps.extend(np.arange(5, min(30, duration), 0.5))
+        
+        # Dense for next 90 seconds (every 1.0s instead of 1.5s)  
+        if duration > 30:
+            dense_timestamps.extend(np.arange(30, min(120, duration), 1.0))
         
         # Add smart content-aware dense sampling around key moments
         if transcript_segments:
             # Look for segments with visual keywords and add nearby timestamps
             visual_keywords = ['show', 'see', 'look', 'here', 'screen', 'this', 'device', 'interface']
+            navigation_keywords = ['navigate', 'click', 'go to', 'open', 'select', 'choose', 'step', 'next']
+            
             for segment in transcript_segments:
                 text = segment.get('text', '').lower()
+                start_time = segment.get('start_time', 0)
+                
+                # Standard visual keywords
                 if any(keyword in text for keyword in visual_keywords):
-                    start_time = segment.get('start', 0)
                     if start_time < 60:  # Only first minute for speed
                         dense_timestamps.extend([start_time - 1, start_time, start_time + 1])
+                
+                # Dense sampling for navigation sequences
+                if any(keyword in text for keyword in navigation_keywords):
+                    if start_time < 120:  # First 2 minutes for navigation sequences
+                        # Add multiple frames for rapid navigation - much denser
+                        for offset in np.arange(0, 3.0, 0.25):  # Every 0.25s for 3 seconds
+                            dense_timestamps.append(start_time + offset)
+                
+                # Additional dense sampling for action words (often indicate screen changes)
+                action_words = ['change', 'update', 'modify', 'create', 'add', 'remove', 'delete', 
+                              'install', 'setup', 'configure', 'enable', 'disable', 'toggle']
+                if any(word in text for word in action_words):
+                    if start_time < 180:  # First 3 minutes for actions
+                        for offset in np.arange(0, 2.0, 0.25):  # Every 0.25s for 2 seconds
+                            dense_timestamps.append(start_time + offset)
         
         # Combine with existing timestamps and remove duplicates
         all_candidates = sorted(set(candidate_timestamps + dense_timestamps))
         candidate_timestamps = all_candidates
         
+        logger.info(f"🎯 Generated {len(candidate_timestamps)} candidate timestamps for {duration:.1f}s video")
+        logger.info(f"📍 First minute candidates: {[f'{ts:.1f}s' for ts in candidate_timestamps if ts <= 60][:15]}...")
+        
         extracted_frames = []
         last_selected_timestamp = None
         
         for i, timestamp in enumerate(candidate_timestamps):
-            # Optimized spacing: reasonable for early periods, wider for later content
-            if timestamp < 30:  # First 30 seconds - allow closer spacing for rapid sequences
-                min_spacing = 2.0
-            elif timestamp < 60:  # Rest of first minute
-                min_spacing = 4.0  
-            else:
-                min_spacing = 12.0
+            # Check if this might be part of a rapid navigation sequence
+            is_rapid_sequence = self._detect_rapid_sequence(timestamp, candidate_timestamps, transcript_segments)
             
-            # Skip if too close to last selected frame
+            # Much more aggressive spacing based on content type
+            if is_rapid_sequence:
+                min_spacing = 0.3  # Very close frames for rapid navigation
+            elif timestamp < 30:  # First 30 seconds - very close spacing
+                min_spacing = 0.8  # Much more aggressive
+            elif timestamp < 60:  # Rest of first minute
+                min_spacing = 1.5  # More aggressive
+            else:
+                min_spacing = 4.0  # More aggressive for later content
+            
+            # Skip if too close to last selected frame (unless rapid sequence)
             if (last_selected_timestamp is not None and 
-                abs(timestamp - last_selected_timestamp) < min_spacing):
+                abs(timestamp - last_selected_timestamp) < min_spacing and 
+                not is_rapid_sequence):
                 continue
             
             # Get single best frame near this timestamp
             best_frame = self._extract_single_frame_near_timestamp(
-                video_path, output_dir, timestamp, fps, extracted_frames
+                video_path, output_dir, timestamp, fps, extracted_frames, is_rapid_sequence
             )
             
             if best_frame:
@@ -88,23 +124,86 @@ class VideoProcessor:
                     extracted_frames.append(best_frame)
                     last_selected_timestamp = timestamp
                     
-                    logger.info(f"Selected frame at {best_frame['timestamp']:.1f}s: score={best_frame.get('score', 0):.3f}")
+                    logger.info(f"✅ SELECTED frame at {best_frame['timestamp']:.1f}s: score={best_frame.get('score', 0):.1f}, rapid={is_rapid_sequence}, spacing={min_spacing:.1f}s")
                 else:
-                    logger.debug(f"Skipped duplicate frame at {best_frame['timestamp']:.1f}s")
+                    logger.info(f"⚠️  DUPLICATE frame at {best_frame['timestamp']:.1f}s (skipped)")
             else:
-                logger.info(f"Rejected frame at {timestamp:.1f}s: no suitable frames found")
+                logger.info(f"❌ REJECTED frame at {timestamp:.1f}s: no suitable frames found, rapid={is_rapid_sequence}, spacing={min_spacing:.1f}s")
                 
         return extracted_frames
+    
+    def _detect_rapid_sequence(self, timestamp: float, all_timestamps: List[float], transcript_segments: List[Dict] = None) -> bool:
+        """Detect if this timestamp is part of a rapid navigation sequence."""
+        # 1. Look for transcript clues indicating rapid navigation
+        transcript_indicates_rapid = False
+        if transcript_segments:
+            for segment in transcript_segments:
+                start_time = segment.get('start_time', 0)
+                end_time = segment.get('end_time', 0)
+                
+                # Check if timestamp is within this segment
+                if start_time <= timestamp <= end_time:
+                    text = segment.get('text', '').lower()
+                    
+                    # Navigation keywords that indicate rapid screen changes
+                    navigation_keywords = [
+                        'navigate', 'click', 'go to', 'open', 'select', 'choose',
+                        'step', 'next', 'then', 'now', 'here', 'switch',
+                        'tab', 'menu', 'option', 'button', 'link', 'page',
+                        'screen', 'interface', 'settings', 'configuration',
+                        'dashboard', 'panel', 'section', 'view', 'window',
+                        'through', 'across', 'between', 'different', 'various',
+                        # Additional patterns found from reverse engineering
+                        'change', 'modify', 'edit', 'update', 'toggle', 'enable',
+                        'disable', 'add', 'remove', 'create', 'delete', 'install',
+                        'uninstall', 'configure', 'setup', 'enter', 'type'
+                    ]
+                    
+                    # Sequence indicators
+                    sequence_phrases = [
+                        'one by one', 'step by step', 'each of', 'all of these',
+                        'multiple', 'several', 'various', 'different options',
+                        'going through', 'walk through', 'show you', 'take you',
+                        # Additional sequence patterns
+                        'moving to', 'switching to', 'changing to', 'jumping to',
+                        'back to', 'forward to', 'over to', 'across to'
+                    ]
+                    
+                    if any(keyword in text for keyword in navigation_keywords + sequence_phrases):
+                        transcript_indicates_rapid = True
+        
+        # 2. Visual change detection - look for clusters of timestamps
+        window_size = 4.0  # Increased window for better detection
+        nearby_timestamps = [t for t in all_timestamps 
+                           if abs(t - timestamp) <= window_size]
+        
+        # 3. Enhanced clustering detection
+        has_timestamp_cluster = len(nearby_timestamps) >= 3
+        
+        # 4. Early video bias - first 2 minutes are more likely to have rapid sequences
+        is_early_video = timestamp <= 120.0
+        
+        # 5. Composite decision logic (more permissive than before)
+        if transcript_indicates_rapid and has_timestamp_cluster:
+            return True
+        elif transcript_indicates_rapid and is_early_video:
+            return True
+        elif has_timestamp_cluster and len(nearby_timestamps) >= 4:  # Strong cluster evidence
+            return True
+        elif is_early_video and len(nearby_timestamps) >= 2:  # Early video with some clustering
+            return True
+            
+        return False
     
     def _get_intelligent_timestamps(self, duration: float, transcript_segments: List[Dict] = None) -> List[float]:
         """Generate intelligent timestamps based on content analysis and intervals."""
         timestamps = []
         
-        # Base interval sampling (reduced frequency, avoid intro/outro)
-        base_interval = self.config.get('frame_sample_interval', 20)  # Increased from 15 to 20
-        intro_skip = min(30, duration * 0.1)  # Skip first 30s or 10% of video, whichever is smaller
-        outro_skip = min(20, duration * 0.05)  # Skip last 20s or 5% of video
-        base_timestamps = list(np.arange(intro_skip + base_interval, duration - outro_skip, base_interval))
+        # Much more aggressive base interval sampling 
+        base_interval = 5  # Much smaller interval for better coverage
+        intro_skip = 5  # Minimal intro skip
+        outro_skip = 10  # Minimal outro skip
+        base_timestamps = list(np.arange(intro_skip, duration - outro_skip, base_interval))
         
         # Content-aware timestamps from transcript
         content_timestamps = []
@@ -114,13 +213,20 @@ class VideoProcessor:
         # Combine and deduplicate
         all_timestamps = set(base_timestamps + content_timestamps)
         
-        # Remove timestamps too close to each other (minimum 10 seconds apart)
+        # Remove timestamps too close to each other (adaptive minimum spacing)
         sorted_timestamps = sorted(all_timestamps)
         filtered_timestamps = []
         
         for ts in sorted_timestamps:
-            if not filtered_timestamps or ts - filtered_timestamps[-1] >= 10:
+            if not filtered_timestamps:
                 filtered_timestamps.append(ts)
+            else:
+                # Check if this might be part of a rapid sequence
+                is_rapid = self._detect_rapid_sequence(ts, sorted_timestamps, transcript_segments)
+                min_gap = 0.5 if is_rapid else 3.0  # Much more aggressive gaps
+                
+                if ts - filtered_timestamps[-1] >= min_gap:
+                    filtered_timestamps.append(ts)
         
         return filtered_timestamps
     
@@ -213,7 +319,7 @@ class VideoProcessor:
         """DISABLED: Content density hotspot detection removed for performance."""
         return []  # Hotspot detection disabled for speed
     
-    def _extract_single_frame_near_timestamp(self, video_path: str, output_dir: str, target_timestamp: float, fps: float, existing_frames: List[Dict]) -> Dict:
+    def _extract_single_frame_near_timestamp(self, video_path: str, output_dir: str, target_timestamp: float, fps: float, existing_frames: List[Dict], is_rapid_sequence: bool = False) -> Dict:
         """Extract the best single frame near a target timestamp."""
         candidate_frames = []
         window_size = 3.0  # Check 3 seconds around target
@@ -232,9 +338,9 @@ class VideoProcessor:
                     .run(capture_stdout=True, capture_stderr=True, quiet=True)  # Suppress output
                 )
                 
-                # Score this candidate
+                # Score this candidate with sequence context
                 score = self._score_frame_quality(frame_path, 
-                    existing_frames[-1]['path'] if existing_frames else None)
+                    existing_frames[-1]['path'] if existing_frames else None, is_rapid_sequence)
                 
                 candidate_frames.append({
                     'path': frame_path,
@@ -250,10 +356,10 @@ class VideoProcessor:
         if candidate_frames:
             best_frame = max(candidate_frames, key=lambda x: x['score'])
             
-            # Quality threshold - prefer no image over bad image (tuned from reverse engineering)
-            min_quality_score = 61.2  # Minimum acceptable score
+            # Quality threshold - much more permissive for rapid sequences
+            min_quality_score = 20.0  # Much lower minimum acceptable score
             
-            if best_frame['score'] >= 85.0:  # Balanced threshold
+            if best_frame['score'] >= 30.0:  # Much lower threshold to catch more frames
                 # Clean up non-selected frames
                 for frame in candidate_frames:
                     if frame != best_frame and os.path.exists(frame['path']):
@@ -268,7 +374,7 @@ class VideoProcessor:
                 return best_frame
             else:
                 # Clean up all frames - none meet quality threshold
-                logger.info(f"No suitable frame found near {target_timestamp:.1f}s (best score: {best_frame['score']:.1f})")
+                logger.info(f"❌ QUALITY REJECTED near {target_timestamp:.1f}s: best_score={best_frame['score']:.1f} < threshold=30.0")
                 for frame in candidate_frames:
                     if os.path.exists(frame['path']):
                         os.remove(frame['path'])
@@ -381,7 +487,7 @@ class VideoProcessor:
                 
                 # Score this candidate
                 score = self._score_frame_quality(frame_path, 
-                    existing_frames[-1]['path'] if existing_frames else None)
+                    existing_frames[-1]['path'] if existing_frames else None, False)
                 
                 candidates.append({
                     'timestamp': offset,
@@ -403,8 +509,8 @@ class VideoProcessor:
         # Sort by score
         candidates.sort(key=lambda x: x['score'], reverse=True)
         
-        # Filter by minimum quality (balanced to catch targets while reducing unwanted)
-        good_candidates = [c for c in candidates if c['score'] >= 85.0]
+        # Filter by minimum quality (much more permissive to catch rapid sequences)
+        good_candidates = [c for c in candidates if c['score'] >= 30.0]
         
         if not good_candidates:
             # Clean up rejected candidates
@@ -443,7 +549,7 @@ class VideoProcessor:
                         is_different = False
                 
                 # Add if different and high quality
-                if is_different and candidate['score'] >= 61.2:  # Use same threshold as main selection
+                if is_different and candidate['score'] >= 30.0:  # Use same lower threshold
                     candidate['is_clustered'] = True  # Mark for smaller display
                     selected.append(candidate)
                     if len(selected) >= 3:  # Max 3 frames per hotspot
@@ -491,7 +597,7 @@ class VideoProcessor:
                 )
                 
                 # Analyze frame quality
-                score = self._score_frame_quality(frame_path, previous_frame_path)
+                score = self._score_frame_quality(frame_path, previous_frame_path, False)
                 
                 candidate_frames.append({
                     'timestamp': offset,
@@ -507,10 +613,10 @@ class VideoProcessor:
         if candidate_frames:
             best_frame = max(candidate_frames, key=lambda x: x['score'])
             
-            # Quality threshold - prefer no image over bad image (tuned from reverse engineering)
-            min_quality_score = 61.2  # Minimum acceptable score
+            # Quality threshold - much more permissive for rapid sequences
+            min_quality_score = 20.0  # Much lower minimum acceptable score
             
-            if best_frame['score'] >= 85.0:  # Balanced threshold
+            if best_frame['score'] >= 30.0:  # Much lower threshold to catch more frames
                 # Clean up non-selected frames
                 for frame in candidate_frames:
                     if frame != best_frame and os.path.exists(frame['path']):
@@ -524,7 +630,7 @@ class VideoProcessor:
                 return best_frame
             else:
                 # Clean up all frames - none meet quality threshold
-                logger.info(f"No suitable frame found near {target_timestamp:.1f}s (best score: {best_frame['score']:.1f})")
+                logger.info(f"❌ QUALITY REJECTED near {target_timestamp:.1f}s: best_score={best_frame['score']:.1f} < threshold=30.0")
                 for frame in candidate_frames:
                     if os.path.exists(frame['path']):
                         os.remove(frame['path'])
@@ -562,7 +668,7 @@ class VideoProcessor:
         face_ratio = total_face_area / total_area
         return face_ratio
     
-    def _score_frame_quality(self, frame_path: str, previous_frame_path: str = None) -> float:
+    def _score_frame_quality(self, frame_path: str, previous_frame_path: str = None, is_rapid_sequence: bool = False) -> float:
         """Score frame quality based on multiple factors to avoid talking heads and prefer interesting content."""
         image = cv2.imread(frame_path)
         if image is None:
@@ -615,6 +721,7 @@ class VideoProcessor:
         logger.debug(f"Face detection: Pass1={len(faces_pass1)}, Pass2={len(faces_pass2)}, Pass3={len(faces_pass3)}, Final={len(faces)}")
         
         talking_head_penalty = 0.0
+        largest_center_face_ratio = 0.0  # Track the largest centered face for sequence logic
         if len(faces) > 0:
             for (x, y, w, h) in faces:
                 face_area = w * h
@@ -640,6 +747,7 @@ class VideoProcessor:
                     if (face_center_y < height * 0.8 and  # Upper 80% of frame (was 75%)
                         abs(face_center_x - center_x) < width * 0.4):  # Center 80% horizontally (was 70%)
                         is_talking_head = True
+                        largest_center_face_ratio = max(largest_center_face_ratio, face_ratio)
                         logger.debug(f"Talking head: centered face at ({face_center_x:.0f},{face_center_y:.0f}), ratio={face_ratio:.3f}")
                 
                 # 3. ULTRA-STRICT center detection for ANY face
@@ -648,6 +756,7 @@ class VideoProcessor:
                     if (face_center_y < height * 0.7 and  # Upper 70% 
                         abs(face_center_x - center_x) < width * 0.3):  # Center 60% horizontally
                         is_talking_head = True
+                        largest_center_face_ratio = max(largest_center_face_ratio, face_ratio)
                         logger.debug(f"Talking head: dead center face at ({face_center_x:.0f},{face_center_y:.0f})")
                 
                 # 4. Face dominates attention (much more aggressive)
@@ -916,6 +1025,31 @@ class VideoProcessor:
         # 15. Small computer/tech device detection bonus
         tech_device_bonus = self._detect_tech_devices(image, gray)
         score += tech_device_bonus
+        
+        # 12. Sequence-aware bonuses for rapid navigation
+        if is_rapid_sequence:
+            # Give significant bonus points for frames in rapid sequences to overcome face penalties
+            sequence_bonus = 80  # Increased from 50
+            score += sequence_bonus
+            logger.debug(f"Rapid sequence bonus: +{sequence_bonus}")
+            
+            # More aggressive face penalty reduction for sequences
+            if largest_center_face_ratio > 0.25:  # Lower threshold for penalty reduction
+                # Reduce existing face penalty for sequences more aggressively
+                face_penalty_reduction = min(300, abs(talking_head_penalty) * 0.7)  # Increased reduction
+                score += face_penalty_reduction
+                logger.debug(f"Sequence face penalty reduction: +{face_penalty_reduction}")
+            
+            # Additional bonus for very early video sequences (likely setup/navigation)
+            # Extract timestamp from filename (e.g., "candidate_15.5s.jpg" -> 15.5)
+            import re
+            timestamp_match = re.search(r'(\d+(?:\.\d+)?)s', frame_path)
+            if timestamp_match:
+                timestamp = float(timestamp_match.group(1))
+                if timestamp <= 60.0:  # First minute
+                    early_sequence_bonus = 30
+                    score += early_sequence_bonus
+                    logger.debug(f"Early sequence bonus: +{early_sequence_bonus}")
         
         return max(0, score)  # Ensure non-negative score
     
@@ -2186,10 +2320,12 @@ class VideoProcessor:
     
     def optimize_images(self, frame_info_list: List[Dict]) -> List[Dict]:
         """Optimize extracted images for web use."""
+        logger.info(f"🖼️  OPTIMIZING {len(frame_info_list)} extracted frames...")
         optimized_frames = []
         
         for frame_info in frame_info_list:
             if not frame_info['should_include']:
+                logger.info(f"⚠️  SKIPPING frame {frame_info.get('timestamp', 'unknown')}s: should_include=False")
                 continue
                 
             original_path = frame_info['path']
@@ -2212,10 +2348,11 @@ class VideoProcessor:
                     frame_info['optimized_path'] = optimized_path
                     optimized_frames.append(frame_info)
                     
-                    logger.info(f"Optimized frame: {optimized_path}")
+                    logger.info(f"✅ OPTIMIZED frame {frame_info.get('timestamp', 'unknown')}s: {optimized_path}")
                     
             except Exception as e:
-                logger.error(f"Error optimizing image {original_path}: {e}")
+                logger.error(f"❌ ERROR optimizing frame {frame_info.get('timestamp', 'unknown')}s: {e}")
                 continue
                 
+        logger.info(f"🖼️  OPTIMIZATION COMPLETE: {len(optimized_frames)} frames optimized from {len(frame_info_list)} input frames")
         return optimized_frames

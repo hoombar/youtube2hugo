@@ -31,3 +31,17 @@ processing:
 # Date configuration
 date:
   offset_days: 1  # Set post date this many days in the past (default: 1 to avoid Hugo future date issues)
+
+# Technical terms correction for improved transcription accuracy
+# Add custom terms that are commonly misheard during speech-to-text
+technical_terms:
+  # Example: Correct term followed by list of common mishearings
+  "Your Product Name":
+    - "your product name"
+    - "you're product name" 
+    - "Your-Product-Name"
+  "Custom Company":
+    - "custom company"
+    - "Custom-Company"
+    - "customcompany"
+  # The system already includes comprehensive Home Assistant/smart home terms
