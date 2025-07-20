@@ -1,28 +1,30 @@
-"""Blog post formatting module using Claude API for content enhancement."""
+"""Blog post formatting module using Gemini API for content enhancement."""
 
 import os
 import re
 from typing import List, Dict, Optional
-from anthropic import Anthropic
+import google.generativeai as genai
 import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class BlogFormatter:
-    """Handles blog post content formatting and enhancement using Claude API."""
+    """Handles blog post content formatting and enhancement using Gemini API."""
     
     def __init__(self, config: Dict):
         self.config = config
-        self.anthropic_client = None
+        self.gemini_client = None
         
-        # Initialize Anthropic client if API key is provided
-        api_key = config.get('claude_api_key') or os.getenv('ANTHROPIC_API_KEY')
+        # Initialize Gemini client if API key is provided
+        api_key = config.get('gemini_api_key') or os.getenv('GOOGLE_API_KEY')
         if api_key:
-            self.anthropic_client = Anthropic(api_key=api_key)
-            logger.info("Claude API client initialized for blog formatting")
+            genai.configure(api_key=api_key)
+            model_name = config.get('gemini_model', 'gemini-2.5-flash')
+            self.gemini_client = genai.GenerativeModel(model_name)
+            logger.info(f"Gemini API client initialized for blog formatting with model: {model_name}")
         else:
-            logger.warning("No Claude API key found. Blog formatting will be skipped.")
+            logger.warning("No Gemini API key found. Blog formatting will be skipped.")
     
     def format_content_with_images(
         self, 
@@ -32,8 +34,8 @@ class BlogFormatter:
     ) -> str:
         """Format content with two-pass Claude processing while preserving image positions."""
         
-        if not self.anthropic_client:
-            error_msg = "Claude API key is required for blog formatting. Please set ANTHROPIC_API_KEY environment variable or use --claude-api-key option."
+        if not self.gemini_client:
+            error_msg = "Gemini API key is required for blog formatting. Please set GOOGLE_API_KEY environment variable or configure gemini.api_key in config."
             logger.error(error_msg)
             raise ValueError(error_msg)
         
@@ -44,17 +46,17 @@ class BlogFormatter:
         enhanced_content = self._enhance_image_context(content_with_images, frame_data)
         
         # Pass 2: Format as blog post with structure
-        logger.info("Formatting content as blog post with Claude API...")
+        logger.info("Formatting content as blog post with Gemini API...")
         formatted_content = self._format_as_blog_post(enhanced_content, title)
         
         # Validate that the output has proper blog structure
         if not self._validate_blog_structure(formatted_content):
-            logger.error("Claude failed to create proper blog structure. Retrying...")
+            logger.error("Gemini failed to create proper blog structure. Retrying...")
             # Try once more with stronger prompt
             formatted_content = self._format_as_blog_post_strict(enhanced_content, title)
             if not self._validate_blog_structure(formatted_content):
-                logger.error("Claude failed to format content properly after retry")
-                raise ValueError("Failed to generate properly structured blog post. Claude API may be having issues.")
+                logger.error("Gemini failed to format content properly after retry")
+                raise ValueError("Failed to generate properly structured blog post. Gemini API may be having issues.")
         
         # Validate that images are reasonably preserved (allow for minor differences)
         formatted_images = self._extract_image_references(formatted_content)
@@ -82,31 +84,31 @@ class BlogFormatter:
         prompt = self._get_blog_formatting_prompt(title)
         
         try:
-            response = self.anthropic_client.messages.create(
-                model=self.config.get('claude_model', 'claude-4-sonnet-20250514'),
-                max_tokens=8000,  # Sonnet supports higher token limits
-                temperature=0.2,  # Lower temperature for more consistent preservation
-                messages=[
-                    {
-                        "role": "user",
-                        "content": f"{prompt}\n\nContent to format:\n{content}"
-                    }
-                ]
+            full_prompt = f"{prompt}\n\nContent to format:\n{content}"
+            
+            response = self.gemini_client.generate_content(
+                full_prompt,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=8000,
+                    temperature=0.2,  # Lower temperature for more consistent preservation
+                )
             )
             
-            formatted_content = response.content[0].text.strip()
+            formatted_content = response.text.strip()
             
             logger.info("Blog post formatting completed successfully")
             return formatted_content
             
         except Exception as e:
-            logger.error(f"Error formatting blog post with Claude: {e}")
+            logger.error(f"Error formatting blog post with Gemini: {e}")
             logger.info("Continuing with original content...")
             return content
     
     def _get_blog_formatting_prompt(self, title: str) -> str:
-        """Generate the prompt for Claude to format content as a blog post."""
-        return f"""Transform this transcript-based content into a well-structured, engaging blog post titled "{title}".
+        """Generate the prompt for Gemini to format content as a blog post."""
+        return f"""Transform this transcript-based content into a well-structured, engaging blog post for "{title}".
+
+IMPORTANT: DO NOT include the title "{title}" anywhere in your output - it will be added separately in the template.
 
 CRITICAL PRESERVATION REQUIREMENTS:
 1. **PRESERVE EVERY SINGLE IMAGE**: All ![...](filename.jpg) references must remain EXACTLY as they are
@@ -115,7 +117,7 @@ CRITICAL PRESERVATION REQUIREMENTS:
 4. **PRESERVE TECHNICAL DETAILS**: Keep all technical information, examples, and explanations
 
 MANDATORY BLOG STRUCTURE REQUIREMENTS:
-- **MUST start with a compelling introduction** using "## Introduction" header
+- **MUST start with a compelling introduction** using "## Introduction" header (NOT the title)
 - **MUST create AT LEAST 5-7 clear section headers** using ## format for main topics
 - **MUST break up ALL long paragraphs** - maximum 3-4 sentences per paragraph
 - **MUST eliminate ALL transcript language** (remove "Right", "So", "Now", "Let's", "Okay")
@@ -224,7 +226,7 @@ Return the complete formatted blog post content (no front matter). Must contain 
     def enhance_transcript_segments(self, segments: List[Dict]) -> List[Dict]:
         """First pass: Clean up transcript segments (called from transcript_extractor)."""
         
-        if not self.anthropic_client:
+        if not self.gemini_client:
             return segments
         
         # Combine all text for processing
@@ -264,19 +266,15 @@ Return only the cleaned transcript text:
 {text}"""
         
         try:
-            response = self.anthropic_client.messages.create(
-                model=self.config.get('claude_model', 'claude-4-sonnet-20250514'),
-                max_tokens=6000,  # Sonnet supports higher token limits
-                temperature=0.1,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": cleanup_prompt
-                    }
-                ]
+            response = self.gemini_client.generate_content(
+                cleanup_prompt,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=6000,
+                    temperature=0.1,
+                )
             )
             
-            cleaned_text = response.content[0].text.strip()
+            cleaned_text = response.text.strip()
             logger.info("First pass transcript cleanup completed")
             return cleaned_text
             
@@ -405,12 +403,14 @@ Return only the cleaned transcript text:
     
     def _format_as_blog_post_strict(self, content: str, title: str) -> str:
         """Strict formatting with even stronger requirements."""
-        prompt = f"""URGENT: Transform this transcript into a properly structured blog post titled "{title}".
+        prompt = f"""URGENT: Transform this transcript into a properly structured blog post for "{title}".
+
+IMPORTANT: DO NOT include the title "{title}" anywhere in your output - it will be added separately.
 
 THIS IS YOUR SECOND ATTEMPT. THE FIRST ATTEMPT FAILED VALIDATION.
 
 MANDATORY REQUIREMENTS (YOUR OUTPUT WILL BE REJECTED IF MISSING):
-1. Must start with exactly "## Introduction"
+1. Must start with exactly "## Introduction" (NOT the title)
 2. Must have AT LEAST 5 total sections with ## headers
 3. Must end with exactly "## Conclusion"  
 4. NO transcript words: "Right", "So", "Let's", "Now", "Okay" anywhere
@@ -440,13 +440,14 @@ Content to transform:
 CRITICAL: Your output MUST start with "## Introduction" and end with "## Conclusion"."""
         
         try:
-            response = self.anthropic_client.messages.create(
-                model=self.config.get('claude_model', 'claude-4-sonnet-20250514'),
-                max_tokens=8000,
-                temperature=0.1,  # Very low temperature for consistent structure
-                messages=[{"role": "user", "content": prompt}]
+            response = self.gemini_client.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=8000,
+                    temperature=0.1,  # Very low temperature for consistent structure
+                )
             )
-            return response.content[0].text.strip()
+            return response.text.strip()
         except Exception as e:
             logger.error(f"Error in strict blog formatting: {e}")
             raise

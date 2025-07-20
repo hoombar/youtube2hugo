@@ -1,4 +1,4 @@
-"""Transcript extraction module using Whisper and Claude API for cleanup."""
+"""Transcript extraction module using Whisper and Gemini API for cleanup."""
 
 import os
 import tempfile
@@ -6,27 +6,29 @@ import whisper
 import ffmpeg
 from typing import List, Dict, Optional
 import logging
-from anthropic import Anthropic
+import google.generativeai as genai
 import json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class TranscriptExtractor:
-    """Handles transcript extraction from video using Whisper and cleanup with Claude."""
+    """Handles transcript extraction from video using Whisper and cleanup with Gemini."""
     
     def __init__(self, config: Dict):
         self.config = config
         self.whisper_model = None
-        self.anthropic_client = None
+        self.gemini_client = None
         
-        # Initialize Anthropic client if API key is provided
-        api_key = config.get('claude_api_key') or os.getenv('ANTHROPIC_API_KEY')
+        # Initialize Gemini client if API key is provided
+        api_key = config.get('gemini_api_key') or os.getenv('GOOGLE_API_KEY')
         if api_key:
-            self.anthropic_client = Anthropic(api_key=api_key)
-            logger.info("Claude API client initialized for transcript cleanup")
+            genai.configure(api_key=api_key)
+            model_name = config.get('gemini_model', 'gemini-2.5-flash')
+            self.gemini_client = genai.GenerativeModel(model_name)
+            logger.info(f"Gemini API client initialized for transcript cleanup with model: {model_name}")
         else:
-            logger.warning("No Claude API key found. Transcript cleanup will be skipped.")
+            logger.warning("No Gemini API key found. Transcript cleanup will be skipped.")
     
     def extract_transcript(self, video_path: str) -> List[Dict]:
         """Extract transcript from video using Whisper."""
@@ -119,31 +121,27 @@ class TranscriptExtractor:
         
         return segments
     
-    def _cleanup_transcript_with_claude(self, segments: List[Dict]) -> List[Dict]:
-        """Clean up transcript segments using Claude API."""
-        logger.info("Cleaning up transcript with Claude API...")
+    def _cleanup_transcript_with_gemini(self, segments: List[Dict]) -> List[Dict]:
+        """Clean up transcript segments using Gemini API."""
+        logger.info("Cleaning up transcript with Gemini API...")
         
         # Combine all text for processing
         full_text = ' '.join(segment['text'] for segment in segments)
         
-        # Prepare the prompt for Claude
+        # Prepare the prompt for Gemini
         cleanup_prompt = self._get_cleanup_prompt(full_text)
         
         try:
-            # Call Claude API
-            response = self.anthropic_client.messages.create(
-                model=self.config.get('claude_model', 'claude-3-haiku-20240307'),
-                max_tokens=4000,
-                temperature=0.1,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": cleanup_prompt
-                    }
-                ]
+            # Call Gemini API
+            response = self.gemini_client.generate_content(
+                cleanup_prompt,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=4000,
+                    temperature=0.1,
+                )
             )
             
-            cleaned_text = response.content[0].text.strip()
+            cleaned_text = response.text.strip()
             
             # Split cleaned text back into segments
             cleaned_segments = self._redistribute_cleaned_text(segments, cleaned_text)
@@ -152,12 +150,12 @@ class TranscriptExtractor:
             return cleaned_segments
             
         except Exception as e:
-            logger.error(f"Error cleaning transcript with Claude: {e}")
+            logger.error(f"Error cleaning transcript with Gemini: {e}")
             logger.info("Continuing with original transcript...")
             return segments
     
     def _get_cleanup_prompt(self, text: str) -> str:
-        """Generate the prompt for Claude to clean up the transcript."""
+        """Generate the prompt for Gemini to clean up the transcript."""
         return f"""Please clean up this video transcript by fixing obvious errors from speech recognition while preserving the original meaning and structure. Only make minimal changes to:
 
 1. Fix obvious typos and misheard words

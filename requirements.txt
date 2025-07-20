@@ -10,7 +10,7 @@ python-dateutil>=2.8.0
 
 # AI/ML dependencies
 openai-whisper>=20250625
-anthropic>=0.28.0
+google-generativeai>=0.8.0
 torch>=2.0.0
 
 # Note: MediaPipe not available for Python 3.13 yet

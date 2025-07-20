@@ -125,6 +125,10 @@ processing:
   cleanup_temp_files: true
   save_transcripts: false
   default_whisper_model: "base"
+  
+# Date configuration
+date:
+  offset_days: 1  # Set post date this many days in the past
 ```
 
 ### CLI Options
@@ -460,6 +464,16 @@ Today we'll cover machine learning basics.
 
 ### Poor Frame Selection
 **Solution**: Use the testing script to analyze and tune frame selection parameters
+
+### Hugo Not Publishing Posts
+```
+Post created but doesn't appear on Hugo site
+```
+**Solution**: Hugo doesn't publish posts with future dates. The tool now defaults to yesterday's date. If needed, adjust in config:
+```yaml
+date:
+  offset_days: 1  # Days in the past (1 = yesterday)
+```
 
 ### Debug Mode
 

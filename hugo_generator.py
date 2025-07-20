@@ -2,7 +2,7 @@
 
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import yaml
 import logging
@@ -46,7 +46,7 @@ class HugoGenerator:
             transcript_segments, frame_data, bundle_dir
         )
         
-        # Second pass: Format content as blog post with Claude
+        # Second pass: Format content as blog post with Gemini
         formatted_content = self.blog_formatter.format_content_with_images(
             raw_content, title, frame_data
         )
@@ -89,9 +89,15 @@ class HugoGenerator:
     ) -> str:
         """Generate Hugo front matter in YAML format."""
         
+        # Generate date that's definitely in the past to avoid Hugo future date issues
+        # Check config for date offset (default: 1 day ago to ensure publication)
+        date_offset_days = self.config.get('date_offset_days', 1)
+        publish_date = datetime.now() - timedelta(days=date_offset_days)
+        date_string = publish_date.strftime('%Y-%m-%dT00:00:00Z')
+        
         front_matter_dict = {
             'title': title,
-            'date': datetime.now().strftime('%Y-%m-%dT00:00:00Z'),
+            'date': date_string,
             'draft': False,
             'tags': [],
             'categories': ['video'],

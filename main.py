@@ -209,12 +209,13 @@ def cli():
 @click.option('--output', '-o', help='Output path for Hugo markdown file (can be configured in config.local.yaml)')
 @click.option('--title', help='Blog post title (auto-generated if not provided)')
 @click.option('--config', '-c', help='Path to configuration file')
-@click.option('--claude-api-key', help='Claude API key for transcript cleanup (or configure in config.local.yaml)')
+@click.option('--gemini-api-key', help='Gemini API key for transcript cleanup (or configure in config.local.yaml)')
 @click.option('--whisper-model', default='base', help='Whisper model size (tiny, base, small, medium, large)')
 @click.option('--save-transcript', is_flag=True, help='Save extracted transcript to .srt file')
 @click.option('--template', help='Path to blog post template file with {{placeholders}}')
 @click.option('--front-matter', help='Path to JSON file with additional front matter data')
-def convert(video, transcript, output, title, config, claude_api_key, whisper_model, save_transcript, template, front_matter):
+@click.option('--date-offset-days', type=int, help='Set post date this many days in the past (default: 1 to avoid Hugo future date issues)')
+def convert(video, transcript, output, title, config, gemini_api_key, whisper_model, save_transcript, template, front_matter, date_offset_days):
     """Convert a video and transcript into a Hugo blog post."""
     
     # Load configuration
@@ -225,14 +226,16 @@ def convert(video, transcript, output, title, config, claude_api_key, whisper_mo
         config_dict.update(custom_config)
     
     # Add command line options to config (CLI overrides local config)
-    if claude_api_key:
-        config_dict['claude_api_key'] = claude_api_key
+    if gemini_api_key:
+        config_dict['gemini_api_key'] = gemini_api_key
     if whisper_model:
         config_dict['whisper_model'] = whisper_model
+    if date_offset_days is not None:
+        config_dict['date_offset_days'] = date_offset_days
     
-    # Check if we have Claude API key from somewhere
-    if not config_dict.get('claude_api_key') and not os.environ.get('ANTHROPIC_API_KEY'):
-        click.echo("⚠️  Warning: No Claude API key found. Set ANTHROPIC_API_KEY env var or configure in config.local.yaml", err=True)
+    # Check if we have Gemini API key from somewhere
+    if not config_dict.get('gemini_api_key') and not os.environ.get('GOOGLE_API_KEY'):
+        click.echo("⚠️  Warning: No Gemini API key found. Set GOOGLE_API_KEY env var or configure in config.local.yaml", err=True)
         click.echo("   Blog formatting will be skipped without API key.", err=True)
     
     # If no output path provided and no base folder configured, require output

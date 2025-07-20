@@ -24,7 +24,7 @@ class Config:
     # Transcript settings
     CONTEXT_WINDOW = 30  # seconds before/after frame for transcript context
     WHISPER_MODEL = "base"  # tiny, base, small, medium, large
-    CLAUDE_MODEL = "claude-4-sonnet-20250514"
+    GEMINI_MODEL = "gemini-2.5-flash"
     
     # Output settings
     DEFAULT_OUTPUT_DIR = "output"
@@ -56,13 +56,21 @@ class Config:
             # Flatten the nested structure for easier access
             flattened = {}
             
-            # Handle Claude API configuration
+            # Handle Gemini API configuration
+            if 'gemini' in local_config:
+                gemini_config = local_config['gemini']
+                if 'api_key' in gemini_config:
+                    flattened['gemini_api_key'] = gemini_config['api_key']
+                if 'model' in gemini_config:
+                    flattened['gemini_model'] = gemini_config['model']
+            
+            # Legacy Claude configuration support (for backward compatibility)
             if 'claude' in local_config:
                 claude_config = local_config['claude']
                 if 'api_key' in claude_config:
-                    flattened['claude_api_key'] = claude_config['api_key']
+                    flattened['gemini_api_key'] = claude_config['api_key']  # Map to gemini
                 if 'model' in claude_config:
-                    flattened['claude_model'] = claude_config['model']
+                    flattened['gemini_model'] = 'gemini-2.5-flash'
             
             # Handle output configuration
             if 'output' in local_config:
@@ -98,6 +106,16 @@ class Config:
                 if 'default_whisper_model' in proc_config:
                     flattened['whisper_model'] = proc_config['default_whisper_model']
             
+            # Handle date configuration
+            if 'date' in local_config:
+                date_config = local_config['date']
+                if 'offset_days' in date_config:
+                    flattened['date_offset_days'] = date_config['offset_days']
+            
+            # Handle Hugo date config (legacy support)
+            if 'hugo' in local_config and 'date_offset_days' in local_config['hugo']:
+                flattened['date_offset_days'] = local_config['hugo']['date_offset_days']
+            
             return flattened
             
         except Exception as e:
@@ -120,7 +138,7 @@ class Config:
             'hugo_content_path': cls.HUGO_CONTENT_PATH,
             'context_window': cls.CONTEXT_WINDOW,
             'whisper_model': cls.WHISPER_MODEL,
-            'claude_model': cls.CLAUDE_MODEL,
+            'gemini_model': cls.GEMINI_MODEL,
             'default_output_dir': cls.DEFAULT_OUTPUT_DIR
         }
         

@@ -12,8 +12,8 @@ image_settings:
 transcript_settings:
   context_window: 30           # Seconds of context around frames
   whisper_model: "base"        # Whisper model: tiny, base, small, medium, large
-  claude_model: "claude-4-sonnet-20250514"  # Claude model for cleanup
-  claude_api_key: ""           # Or set ANTHROPIC_API_KEY env var
+  gemini_model: "gemini-2.5-flash"  # Gemini model for cleanup
+  gemini_api_key: ""           # Or set GOOGLE_API_KEY env var
 
 hugo_settings:
   use_hugo_shortcodes: false   # Use {{< figure >}} shortcode instead of ![]()
