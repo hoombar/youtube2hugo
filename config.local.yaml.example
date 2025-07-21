@@ -47,7 +47,7 @@ processing:
   cleanup_temp_files: true
   save_transcripts: false
   default_whisper_model: "base"
-  image_similarity_threshold: 0.15  # Remove images more than 15% similar (0.0=identical, 1.0=completely different)
+  image_similarity_threshold: 0.85  # Remove images more than 85% similar (0.0=completely different, 1.0=identical)
   
 # Date configuration
 date:

@@ -412,52 +412,56 @@ class HugoGenerator:
         
         # Apply similarity filtering to remove duplicate-looking images
         if len(result) > 1:
-            logger.debug(f"  🔍 SIMILARITY CHECK: Filtering {len(result)} frames for duplicates...")
             similarity_threshold = self.config.get('image_similarity_threshold', 0.15)
+            logger.debug(f"  🔍 SIMILARITY CHECK: Filtering {len(result)} frames for duplicates (threshold={similarity_threshold})...")
             result = self._remove_similar_images(result, similarity_threshold)
         
         return result
     
     def _calculate_image_hash(self, image_path: str) -> str:
-        """Calculate perceptual hash for image similarity detection."""
+        """Calculate perceptual hash for image similarity detection using difference hash (dHash)."""
         try:
             # Load image and convert to grayscale
             image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
             if image is None:
                 return ""
             
-            # Resize to standard size for comparison
-            resized = cv2.resize(image, (16, 16), interpolation=cv2.INTER_AREA)
+            # Resize to 9x8 for difference hash (we need 8x8 differences)
+            resized = cv2.resize(image, (9, 8), interpolation=cv2.INTER_AREA)
             
-            # Calculate average pixel value
-            avg = resized.mean()
-            
-            # Create binary hash based on pixel values vs average
+            # Calculate horizontal differences (more sensitive than average-based)
             hash_bits = []
             for row in resized:
-                for pixel in row:
-                    hash_bits.append('1' if pixel > avg else '0')
+                for i in range(len(row) - 1):
+                    # Compare adjacent pixels
+                    hash_bits.append('1' if row[i] > row[i + 1] else '0')
             
-            # Convert to hex string
+            # Convert to hex string - handle large binary strings properly
             binary_string = ''.join(hash_bits)
-            hash_value = hex(int(binary_string, 2))[2:]
             
-            return hash_value
+            # Split into chunks to avoid int overflow
+            hex_parts = []
+            for i in range(0, len(binary_string), 60):  # Process 60 bits at a time
+                chunk = binary_string[i:i+60]
+                if chunk:
+                    hex_parts.append(format(int(chunk, 2), 'x'))
+            
+            return ''.join(hex_parts)
             
         except Exception as e:
             logger.warning(f"Could not calculate hash for {image_path}: {e}")
             return ""
     
     def _calculate_hash_similarity(self, hash1: str, hash2: str) -> float:
-        """Calculate similarity between two perceptual hashes (0.0 = identical, 1.0 = completely different)."""
+        """Calculate similarity between two perceptual hashes (0.0 = completely different, 1.0 = identical)."""
         if not hash1 or not hash2 or len(hash1) != len(hash2):
-            return 1.0
+            return 0.0  # Return 0 (different) if hashes invalid
         
-        # Count different bits
-        different_bits = sum(c1 != c2 for c1, c2 in zip(hash1, hash2))
+        # Count matching bits
+        matching_bits = sum(c1 == c2 for c1, c2 in zip(hash1, hash2))
         
-        # Return normalized difference (0.0 = identical, 1.0 = completely different)
-        return different_bits / len(hash1)
+        # Return normalized similarity (0.0 = completely different, 1.0 = identical)
+        return matching_bits / len(hash1)
     
     def _remove_similar_images(self, frames: List[Dict], similarity_threshold: float = 0.15) -> List[Dict]:
         """Remove images that are too similar to other images in the same set."""
@@ -485,17 +489,17 @@ class HugoGenerator:
                 
                 similarity = self._calculate_hash_similarity(frame_data['hash'], other_frame_data['hash'])
                 
-                if similarity <= similarity_threshold:
+                if similarity >= similarity_threshold:
                     # Keep the higher scoring frame, remove the lower scoring one
                     frame1_score = frame_data['frame'].get('score', 0)
                     frame2_score = other_frame_data['frame'].get('score', 0)
                     
                     if frame1_score >= frame2_score:
                         other_frame_data['kept'] = False
-                        logger.debug(f"  🗑️  REMOVED similar frame {other_frame_data['frame']['timestamp']:.1f}s (similarity={similarity:.3f}, score={frame2_score:.1f} < {frame1_score:.1f})")
+                        logger.debug(f"  🗑️  REMOVED similar frame {other_frame_data['frame']['timestamp']:.1f}s (similarity={similarity:.3f} >= {similarity_threshold}, score={frame2_score:.1f} < {frame1_score:.1f})")
                     else:
                         frame_data['kept'] = False
-                        logger.debug(f"  🗑️  REMOVED similar frame {frame_data['frame']['timestamp']:.1f}s (similarity={similarity:.3f}, score={frame1_score:.1f} < {frame2_score:.1f})")
+                        logger.debug(f"  🗑️  REMOVED similar frame {frame_data['frame']['timestamp']:.1f}s (similarity={similarity:.3f} >= {similarity_threshold}, score={frame1_score:.1f} < {frame2_score:.1f})")
                         break  # No need to check more if this frame is removed
         
         # Return only the frames that should be kept
