@@ -369,7 +369,7 @@ class HugoGenerator:
         if self.config.get('use_hugo_shortcodes', False):
             return f'{{{{< figure src="{image_path}" alt="{alt_text}" caption="From: {section_title}" >}}}}'
         else:
-            return f'![{alt_text}]({image_path})\n*{section_title}*'
+            return f'![{alt_text}]({image_path})'
     
     def _generate_semantic_frame_grid_markdown(self, frames: List[Dict], paragraph: List[Dict]) -> str:
         """Generate grid markdown for multiple semantic frames."""
@@ -396,7 +396,7 @@ class HugoGenerator:
                 else:
                     image_elements.append(f'{{{{< figure src="{image_path}" alt="{alt_text}" class="grid-image" >}}}}')
             else:
-                img_style = "width: calc(33.333% - 7px) !important; height: auto !important; object-fit: cover; border-radius: 4px; display: inline-block !important; margin: 5px !important;"
+                img_style = "width: calc(45% - 10px) !important; height: auto !important; object-fit: cover; border-radius: 4px; display: inline-block !important; margin: 5px !important;"
                 if show_timestamps:
                     caption_style = "font-size: 0.8em !important; color: #666 !important; text-align: center !important; margin-top: 5px !important;"
                     image_elements.append(f'''<div class="grid-item">
