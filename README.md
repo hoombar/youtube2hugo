@@ -5,9 +5,9 @@ Convert YouTube videos into structured Hugo blog posts with intelligent frame se
 ## Features
 
 - **Automatic Transcript Extraction**: Uses OpenAI Whisper to extract transcripts directly from video
-- **Two-Pass AI Enhancement**: 
-  - **Pass 1**: Claude API cleans up transcription errors and typos
-  - **Pass 2**: Claude API transforms transcript into engaging blog post with headers and structure
+- **AI-Powered Content Enhancement**: 
+  - **Semantic Frame Selection**: Gemini AI analyzes transcript content to intelligently select relevant frames
+  - **Content-Aware Formatting**: Single-pass blog post generation with contextual image placement
 - **Smart Frame Analysis**: Uses computer vision to identify frames containing visual aids (not talking head shots)  
 - **Multi-format Support**: Handles existing SRT, VTT, and plain text transcripts or extracts new ones
 - **Intelligent Image Placement**: Only extracts frames where visual content is prominent
@@ -57,8 +57,9 @@ sudo apt update && sudo apt install ffmpeg
    
    Edit `config.local.yaml` with your settings:
    ```yaml
-   claude:
-     api_key: "your-anthropic-api-key-here"
+   gemini:
+     api_key: "your-google-api-key-here"
+     model: "gemini-2.5-flash"
    
    output:
      base_folder: "/path/to/your/hugo/site"
@@ -100,10 +101,10 @@ python main.py batch-process batch-config.yaml
 This file is excluded from git and contains sensitive settings:
 
 ```yaml
-# Claude API configuration
-claude:
-  api_key: "your-anthropic-api-key-here"
-  model: "claude-4-sonnet-20250514"
+# Gemini API configuration
+gemini:
+  api_key: "your-google-api-key-here"
+  model: "gemini-2.5-flash"
 
 # Output configuration  
 output:
@@ -141,7 +142,7 @@ Key options:
 - `--video`: Path to video file (required)
 - `--title`: Blog post title (creates kebab-case folder)
 - `--output`: Output path (optional if base_folder configured)
-- `--claude-api-key`: Override API key from config
+- `--gemini-api-key`: Override API key from config
 - `--template`: Custom blog post template
 
 ## Advanced Usage
@@ -152,7 +153,7 @@ Create a batch configuration file:
 
 ```yaml
 settings:
-  claude_api_key: "your-key"
+  gemini_api_key: "your-key"
   output_base_folder: "/path/to/hugo"
 
 videos:
@@ -178,15 +179,16 @@ Choose speed vs accuracy:
 
 ## How It Works
 
-## Frame Selection Algorithm
+## Semantic Frame Selection Algorithm
 
-The algorithm intelligently selects frames by:
+The new semantic algorithm intelligently selects frames by:
 
-1. **Content-Aware Sampling**: Analyzes transcript for visual keywords
-2. **Quality Scoring**: Prioritizes frames with screen content, devices, UI elements
-3. **Talking Head Avoidance**: Filters out frames dominated by faces
-4. **Temporal Diversity**: Ensures varied content across time
-5. **Clustered Content**: Groups rapid-fire sequences with smaller images
+1. **AI Content Analysis**: Gemini AI analyzes transcript to identify semantic sections and topics
+2. **Frame-Content Matching**: Each frame is analyzed for visual content and matched to relevant topics
+3. **Contextual Relevance**: Frames are selected based on how well they illustrate the discussed concepts
+4. **Quality Scoring**: Prioritizes frames with screen content, diagrams, code, and UI elements
+5. **Talking Head Avoidance**: Filters out frames dominated by faces using computer vision
+6. **Section-Aware Placement**: Images are placed with rich context from their semantic sections
 
 ### Testing Frame Selection
 
@@ -202,13 +204,14 @@ python test_frame_selection.py video.mp4 --mode reverse --timestamps "8.0,15.0,2
 
 ## Blog Post Formatting
 
-Claude AI transforms raw transcripts into structured blog posts with:
+Gemini AI transforms raw transcripts into structured blog posts with:
 
-- **Clear section headers** (Introduction, main topics, Conclusion)
-- **Engaging introductions** that hook readers
+- **Semantic content analysis** to understand topics and concepts
+- **Clear section headers** based on content themes
+- **Contextual image placement** that matches visual content to discussed topics
+- **Enhanced alt text** with section context and descriptions
 - **Logical flow** with smooth transitions
 - **Technical accuracy** preservation
-- **Image integration** with contextual placement
 
 ## Templates
 
@@ -318,9 +321,10 @@ python main.py convert \
 youtube2hugo/
 ├── main.py                 # Main CLI application
 ├── video_processor.py      # Video analysis and frame extraction
-├── transcript_extractor.py # Automatic transcript extraction with Whisper + Claude
+├── transcript_extractor.py # Automatic transcript extraction with Whisper
 ├── transcript_parser.py    # Existing transcript file processing
-├── blog_formatter.py       # Two-pass Claude AI content enhancement
+├── semantic_frame_selector.py # AI-powered semantic frame selection
+├── blog_formatter.py       # Gemini AI content enhancement
 ├── hugo_generator.py       # Hugo markdown generation with template support
 ├── config.py              # Configuration management
 ├── requirements.txt        # Python dependencies
@@ -336,23 +340,22 @@ youtube2hugo/
         └── minimal-template.md
 ```
 
-## Two-Pass AI Enhancement
+## AI-Powered Content Enhancement
 
-When a Claude API key is provided, the tool performs two passes of AI enhancement:
+When a Gemini API key is provided, the tool performs intelligent content processing:
 
-### Pass 1: Transcript Cleanup
-- Fixes speech recognition errors and typos
-- Removes filler words ("um", "uh", repeated phrases)
-- Corrects grammar and punctuation
-- Maintains original meaning and conversational flow
+### Semantic Analysis & Frame Selection
+- Analyzes transcript content to identify semantic sections and topics
+- Extracts frames that visually represent the discussed concepts
+- Matches visual content to textual content using AI analysis
+- Scores frames based on relevance to the discussion topics
 
-### Pass 2: Blog Post Formatting
-- Transforms transcript into engaging blog post
-- Adds proper headers and section structure
-- Improves readability and flow
-- **Preserves all image placements** from the original transcript timing
-- Creates introduction and conclusion sections
-- Adds smooth transitions between topics
+### Blog Post Formatting
+- Transforms transcript into engaging blog post with semantic context
+- Places images based on content relevance rather than just timing
+- Generates enhanced alt text with section context
+- Creates smooth content flow with contextually appropriate visuals
+- Preserves technical accuracy while improving readability
 
 ### Example Transformation
 
@@ -361,12 +364,7 @@ When a Claude API key is provided, the tool performs two passes of AI enhancemen
 Um, so today we're going to talk about, uh, machine learning and, you know, how it works. So basically machine learning is, is when computers learn patterns from data...
 ```
 
-**After Pass 1 (cleaned):**
-```
-Today we're going to talk about machine learning and how it works. Machine learning is when computers learn patterns from data...
-```
-
-**After Pass 2 (formatted):**
+**After AI Processing (semantic analysis + formatting):**
 ```
 # Introduction to Machine Learning
 
@@ -375,6 +373,11 @@ Welcome to this comprehensive guide on machine learning fundamentals.
 ## What is Machine Learning?
 
 Machine learning is the process by which computers learn patterns from data...
+
+![Machine learning workflow diagram demonstration at 45.2s](frame_45.2s.jpg)
+*Configuration and Setup*
+
+The above diagram illustrates the core components of a machine learning pipeline...
 ```
 
 ## Advanced Usage
@@ -450,11 +453,11 @@ Today we'll cover machine learning basics.
 
 ## Troubleshooting
 
-### No Claude API Key
+### No Gemini API Key
 ```
-⚠️ Warning: No Claude API key found
+⚠️ Warning: No Gemini API key found
 ```
-**Solution**: Add API key to `config.local.yaml` or set `ANTHROPIC_API_KEY` environment variable
+**Solution**: Add API key to `config.local.yaml` or set `GOOGLE_API_KEY` environment variable
 
 ### Missing Output Path
 ```
@@ -498,7 +501,7 @@ MIT License - see LICENSE file for details.
 - Python 3.8+
 - FFmpeg
 - OpenAI Whisper
-- Claude API key (optional, for transcript cleanup)
+- Google Generative AI (Gemini API) for semantic frame selection and content enhancement
 - OpenCV
 - MediaPipe
 - PyTorch (for Whisper)
@@ -506,7 +509,7 @@ MIT License - see LICENSE file for details.
 
 ## Environment Variables
 
-- `ANTHROPIC_API_KEY`: Your Claude API key for transcript cleanup (optional)
+- `GOOGLE_API_KEY`: Your Gemini API key for semantic frame selection and content enhancement
 
 ## Example Output
 
