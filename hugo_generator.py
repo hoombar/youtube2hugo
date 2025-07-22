@@ -64,7 +64,7 @@ class HugoGenerator:
             raw_content, title, frame_data
         )
         
-        # Apply template if provided
+        # Apply template if provided (simple substitution, no additional Gemini processing)
         if template_path:
             template_variables = {
                 'title': title,
@@ -75,8 +75,9 @@ class HugoGenerator:
             if front_matter_data:
                 template_variables.update(front_matter_data)
             
-            final_content = self.blog_formatter.apply_template(
-                formatted_content, template_path, template_variables
+            # Simple template substitution without additional Gemini processing
+            final_content = self._apply_simple_template(
+                template_path, template_variables
             )
         else:
             # Use default front matter + content structure
@@ -1024,3 +1025,24 @@ class HugoGenerator:
         logger.debug(f"🔍 IMAGE REFERENCES: Found {len(referenced_files)} unique image references: {referenced_files}")
         
         return referenced_files
+    
+    def _apply_simple_template(self, template_path: str, variables: Dict) -> str:
+        """Apply template with simple variable substitution, no additional Gemini processing."""
+        
+        try:
+            with open(template_path, 'r', encoding='utf-8') as f:
+                template_content = f.read()
+            
+            # Simple variable substitution using string replacement
+            result = template_content
+            for key, value in variables.items():
+                placeholder = f"{{{{{key}}}}}"
+                result = result.replace(placeholder, str(value))
+            
+            logger.info(f"Applied template: {template_path}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Failed to apply template {template_path}: {e}")
+            # Fallback to default structure
+            return f"---\ntitle: {variables.get('title', 'Untitled')}\ndate: {variables.get('date', '')}\n---\n\n{variables.get('content', '')}"
