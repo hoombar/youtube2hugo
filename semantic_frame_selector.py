@@ -341,6 +341,19 @@ class SemanticFrameScorer:
             text = pytesseract.image_to_string(frame, config='--psm 6')
             text_lower = text.lower()
             
+            # Title sequence detection - heavily penalize frames with title/intro indicators
+            title_indicators = [
+                'smart home ideas', 'subscribe', 'like and subscribe', 'channel',
+                'intro', 'introduction', 'welcome to', 'today we', 'today i',
+                'lightbulb', 'bulb', 'logo', 'brand', 'title', 'episode',
+                'part 1', 'part 2', 'tutorial series', 'coming up'
+            ]
+            
+            for indicator in title_indicators:
+                if indicator in text_lower:
+                    logger.debug(f"Title sequence detected: '{indicator}' found in frame text")
+                    return -50.0  # Heavy penalty for title sequence frames
+            
             score = 0.0
             mentioned_texts = section.get('mentioned_text', [])
             

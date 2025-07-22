@@ -397,17 +397,26 @@ class HugoGenerator:
                 else:
                     image_elements.append(f'{{{{< figure src="{image_path}" alt="{alt_text}" class="grid-image" >}}}}')
             else:
-                img_style = "width: calc(45% - 10px) !important; height: auto !important; object-fit: cover; border-radius: 4px; display: inline-block !important; margin: 5px !important;"
-                if show_timestamps:
-                    caption_style = "font-size: 0.8em !important; color: #666 !important; text-align: center !important; margin-top: 5px !important;"
-                    image_elements.append(f'''<div class="grid-item">
-    <img src="{image_path}" alt="{alt_text}" style="{img_style}">
-    <div style="{caption_style}">{section} ({timestamp:.1f}s)</div>
-</div>''')
+                # Calculate responsive width based on number of images
+                num_images = len(frames)
+                if num_images == 2:
+                    img_width = "calc(48% - 5px)"
+                elif num_images == 3:
+                    img_width = "calc(32% - 7px)" 
+                elif num_images == 4:
+                    img_width = "calc(48% - 5px)"  # 2x2 grid
+                elif num_images >= 5:
+                    img_width = "calc(32% - 7px)"  # 3 per row
                 else:
-                    image_elements.append(f'''<div class="grid-item">
-    <img src="{image_path}" alt="{alt_text}" style="{img_style}">
-</div>''')
+                    img_width = "calc(45% - 10px)"  # fallback
+                
+                img_style = f"width: {img_width} !important; height: auto !important; object-fit: cover; border-radius: 4px; display: inline-block !important; margin: 3px !important;"
+                
+                # Use simple img tags without div wrappers for cleaner output
+                if show_timestamps:
+                    image_elements.append(f'<img src="{image_path}" alt="{alt_text}" title="{section} ({timestamp:.1f}s)" style="{img_style}">')
+                else:
+                    image_elements.append(f'<img src="{image_path}" alt="{alt_text}" style="{img_style}">')
         
         # Wrap in grid container
         grid_style = f"display: flex; flex-wrap: wrap; gap: {gap_size}; margin: 20px 0; justify-content: space-around;"
