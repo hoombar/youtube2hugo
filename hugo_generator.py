@@ -45,10 +45,19 @@ class HugoGenerator:
             title, video_info, front_matter_data
         )
         
-        # Generate content with smart image placement (using relative paths)
-        raw_content = self._generate_content_with_images(
-            transcript_segments, frame_data, bundle_dir
-        )
+        # Check if frames have semantic section information
+        has_semantic_info = any(f.get('section_title') for f in frame_data)
+        
+        if has_semantic_info:
+            # Generate content with semantic frame placement
+            raw_content = self._generate_content_with_semantic_frames(
+                transcript_segments, frame_data, bundle_dir
+            )
+        else:
+            # Fallback to traditional temporal placement
+            raw_content = self._generate_content_with_images(
+                transcript_segments, frame_data, bundle_dir
+            )
         
         # Second pass: Format content as blog post with Gemini
         formatted_content = self.blog_formatter.format_content_with_images(
@@ -257,6 +266,164 @@ class HugoGenerator:
             logger.warning(f"⚠️  {unused_frames} frames were not placed (no matching transcript timing)")
         
         return '\n\n'.join(content_parts)
+    
+    def _generate_content_with_semantic_frames(
+        self, 
+        transcript_segments: List[Dict], 
+        frame_data: List[Dict],
+        bundle_dir: Optional[str] = None
+    ) -> str:
+        """Generate blog content using semantically selected frames with section information."""
+        
+        logger.info(f"🧠 SEMANTIC CONTENT GENERATION: Processing {len(frame_data)} semantic frames...")
+        
+        # Group frames by their semantic sections
+        section_frames = {}
+        for frame in frame_data:
+            section_title = frame.get('section_title', 'General Content')
+            if section_title not in section_frames:
+                section_frames[section_title] = []
+            section_frames[section_title].append(frame)
+        
+        logger.info(f"📋 Found {len(section_frames)} semantic sections with frames")
+        
+        # Group transcript into traditional paragraphs for text content
+        paragraphs = self._group_segments_into_paragraphs(transcript_segments)
+        
+        content_parts = []
+        used_frame_timestamps = set()
+        
+        # Generate content paragraph by paragraph, inserting semantic frames
+        for i, paragraph in enumerate(paragraphs):
+            paragraph_start = paragraph[0]['start_time']
+            paragraph_end = paragraph[-1]['end_time']
+            
+            # Add paragraph text
+            paragraph_text = self._format_paragraph_text(paragraph)
+            content_parts.append(paragraph_text)
+            
+            # Find semantic frames that best match this paragraph's timeframe
+            relevant_frames = []
+            for section_title, frames in section_frames.items():
+                for frame in frames:
+                    timestamp = frame['timestamp']
+                    # Check if frame falls within or near this paragraph
+                    if (paragraph_start <= timestamp <= paragraph_end or
+                        abs(timestamp - paragraph_start) <= 30 or  # 30s window
+                        abs(timestamp - paragraph_end) <= 30):
+                        
+                        if timestamp not in used_frame_timestamps:
+                            relevant_frames.append(frame)
+                            used_frame_timestamps.add(timestamp)
+            
+            # Sort relevant frames by timestamp
+            relevant_frames.sort(key=lambda x: x['timestamp'])
+            
+            if relevant_frames:
+                # Generate frame content
+                if len(relevant_frames) == 1:
+                    frame = relevant_frames[0]
+                    image_markdown = self._generate_semantic_frame_markdown(frame, paragraph)
+                    content_parts.append(image_markdown)
+                    logger.info(f"  🖼️  PLACED semantic frame {frame['timestamp']:.1f}s from section '{frame.get('section_title', 'Unknown')}' in paragraph {i+1}")
+                else:
+                    # Multiple frames - use grid layout
+                    grid_markdown = self._generate_semantic_frame_grid_markdown(relevant_frames, paragraph)
+                    content_parts.append(grid_markdown)
+                    logger.info(f"  📐 PLACED {len(relevant_frames)} semantic frames in grid for paragraph {i+1}")
+        
+        # Add any remaining frames that weren't placed (orphaned frames)
+        orphaned_frames = []
+        for section_title, frames in section_frames.items():
+            for frame in frames:
+                if frame['timestamp'] not in used_frame_timestamps:
+                    orphaned_frames.append(frame)
+        
+        if orphaned_frames:
+            logger.info(f"  📎 Adding {len(orphaned_frames)} orphaned semantic frames at end")
+            content_parts.append("## Additional Content")
+            
+            if len(orphaned_frames) == 1:
+                frame = orphaned_frames[0]
+                image_markdown = self._generate_semantic_frame_markdown(frame, [])
+                content_parts.append(image_markdown)
+            else:
+                grid_markdown = self._generate_semantic_frame_grid_markdown(orphaned_frames, [])
+                content_parts.append(grid_markdown)
+        
+        logger.info(f"📊 SEMANTIC CONTENT SUMMARY: Generated content with frames from {len(section_frames)} sections")
+        return '\n\n'.join(content_parts)
+    
+    def _generate_semantic_frame_markdown(self, frame: Dict, paragraph: List[Dict]) -> str:
+        """Generate markdown for a semantic frame with section context."""
+        
+        # Get frame info
+        alt_text = self._generate_semantic_alt_text(frame, paragraph)
+        image_path = self._get_hugo_image_path(frame)
+        
+        # Add section context if available
+        section_title = frame.get('section_title', '')
+        semantic_score = frame.get('semantic_score', 0)
+        
+        # Generate enhanced markdown with semantic info
+        if self.config.get('use_hugo_shortcodes', False):
+            return f'{{{{< figure src="{image_path}" alt="{alt_text}" caption="From: {section_title}" >}}}}'
+        else:
+            return f'![{alt_text}]({image_path})\n*{section_title}*'
+    
+    def _generate_semantic_frame_grid_markdown(self, frames: List[Dict], paragraph: List[Dict]) -> str:
+        """Generate grid markdown for multiple semantic frames."""
+        
+        if len(frames) == 1:
+            return self._generate_semantic_frame_markdown(frames[0], paragraph)
+        
+        # Get grid configuration
+        gap_size = self.config.get('image_grid', {}).get('gap_size', '10px')
+        show_timestamps = self.config.get('image_grid', {}).get('show_timestamps', True)
+        
+        # Generate grid with semantic context
+        image_elements = []
+        for frame in frames:
+            alt_text = self._generate_semantic_alt_text(frame, paragraph)
+            image_path = self._get_hugo_image_path(frame)
+            timestamp = frame['timestamp']
+            section = frame.get('section_title', 'Unknown')
+            
+            if self.config.get('use_hugo_shortcodes', False):
+                if show_timestamps:
+                    caption = f"{section} ({timestamp:.1f}s)"
+                    image_elements.append(f'{{{{< figure src="{image_path}" alt="{alt_text}" caption="{caption}" class="grid-image" >}}}}')
+                else:
+                    image_elements.append(f'{{{{< figure src="{image_path}" alt="{alt_text}" class="grid-image" >}}}}')
+            else:
+                img_style = "width: calc(33.333% - 7px) !important; height: auto !important; object-fit: cover; border-radius: 4px; display: inline-block !important; margin: 5px !important;"
+                if show_timestamps:
+                    caption_style = "font-size: 0.8em !important; color: #666 !important; text-align: center !important; margin-top: 5px !important;"
+                    image_elements.append(f'''<div class="grid-item">
+    <img src="{image_path}" alt="{alt_text}" style="{img_style}">
+    <div style="{caption_style}">{section} ({timestamp:.1f}s)</div>
+</div>''')
+                else:
+                    image_elements.append(f'''<div class="grid-item">
+    <img src="{image_path}" alt="{alt_text}" style="{img_style}">
+</div>''')
+        
+        # Wrap in grid container
+        grid_style = f"display: flex; flex-wrap: wrap; gap: {gap_size}; margin: 20px 0; justify-content: space-around;"
+        return f'<div class="semantic-image-grid" style="{grid_style}">\n{chr(10).join(image_elements)}\n</div>'
+    
+    def _generate_semantic_alt_text(self, frame: Dict, paragraph: List[Dict]) -> str:
+        """Generate alt text for semantic frames using section context."""
+        
+        section_title = frame.get('section_title', 'Content')
+        timestamp = frame['timestamp']
+        
+        # Use section title as primary context
+        if section_title and section_title != 'Unknown':
+            return f"{section_title} demonstration at {timestamp:.1f}s"
+        else:
+            # Fallback to traditional alt text generation
+            return self._generate_alt_text(frame, paragraph)
     
     def _group_segments_into_paragraphs(self, segments: List[Dict]) -> List[List[Dict]]:
         """Group transcript segments into logical paragraphs."""

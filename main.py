@@ -13,6 +13,7 @@ from video_processor import VideoProcessor
 from transcript_parser import TranscriptParser
 from transcript_extractor import TranscriptExtractor
 from hugo_generator import HugoGenerator
+from semantic_frame_selector import SemanticFrameSelector
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,6 +27,7 @@ class YouTube2Hugo:
         self.transcript_parser = TranscriptParser(config_dict)
         self.transcript_extractor = TranscriptExtractor(config_dict)
         self.hugo_generator = HugoGenerator(config_dict)
+        self.semantic_frame_selector = SemanticFrameSelector(config_dict, self.video_processor)
     
     def process_video(
         self,
@@ -61,13 +63,15 @@ class YouTube2Hugo:
                         transcript_segments, transcript_output, 'srt'
                     )
             
-            # Extract and analyze video frames using transcript context
-            logger.info("Extracting video frames with content-aware selection...")
-            frame_data = self.video_processor.extract_frames(video_path, temp_dir, transcript_segments)
+            # Extract and analyze video frames using semantic approach
+            logger.info("Extracting video frames with semantic content analysis...")
+            semantic_frames = self.semantic_frame_selector.select_frames_semantically(
+                video_path, transcript_segments, temp_dir
+            )
             
-            # Optimize images
-            logger.info("Optimizing images...")
-            optimized_frames = self.video_processor.optimize_images(frame_data)
+            # Optimize semantic frames (ensure proper formatting and optimization)
+            logger.info("Optimizing semantic frames...")
+            optimized_frames = self.video_processor.optimize_images(semantic_frames)
             
             # Generate blog post title if not provided
             if not title:
