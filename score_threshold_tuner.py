@@ -145,9 +145,16 @@ class ScoreThresholdTuner:
                     experiment_dir = os.path.join(output_dir, experiment_name)
                     os.makedirs(experiment_dir, exist_ok=True)
                     
-                    print(f"   💾 Saving {total_frames} frames to: {experiment_dir}")
+                    print(f"   💾 Attempting to save {total_frames} frames to: {experiment_dir}")
                     
+                    saved_count = 0
                     for i, frame in enumerate(selected_frames):
+                        # Debug frame structure
+                        if i == 0:  # Log first frame structure for debugging
+                            print(f"   🔍 Frame structure: {list(frame.keys())}")
+                            if 'path' in frame:
+                                print(f"   🔍 Frame path: {frame['path']}, exists: {os.path.exists(frame['path'])}")
+                        
                         if 'path' in frame and os.path.exists(frame['path']):
                             # Copy frame to experiment directory
                             original_name = os.path.basename(frame['path'])
@@ -163,11 +170,20 @@ class ScoreThresholdTuner:
                                     'section': frame.get('section_title', 'Unknown'),
                                     'score': frame.get('semantic_score', 0)
                                 })
+                                saved_count += 1
                             except Exception as copy_error:
                                 print(f"   ⚠️  Failed to copy frame {original_name}: {copy_error}")
+                        else:
+                            path_info = frame.get('path', 'NO_PATH_KEY')
+                            print(f"   ⚠️  Frame {i+1} has no valid path: {path_info}")
+                    
+                    print(f"   ✅ Successfully saved {saved_count}/{total_frames} frames")
                     
                     # Create summary HTML for easy viewing
-                    self._create_frame_summary_html(experiment_dir, saved_frames_info, experiment_name)
+                    if saved_frames_info:
+                        self._create_frame_summary_html(experiment_dir, saved_frames_info, experiment_name)
+                    else:
+                        print(f"   ❌ No frames saved - cannot create HTML summary")
                 
                 return {
                     'parameters': {
@@ -285,7 +301,7 @@ class ScoreThresholdTuner:
         # Select best frames for each section
         selected_frames = []
         for section in semantic_sections:
-            section_frames = semantic_selector._select_frames_for_section(
+            section_frames = semantic_selector._select_frames_for_section_optimized(
                 section, all_frames
             )
             selected_frames.extend(section_frames)
