@@ -28,20 +28,25 @@ class ScoreThresholdTuner:
     
     def __init__(self, config_path: str = None):
         """Initialize with configuration."""
-        # Try local config first, then fallback to main config
-        config_file = config_path
-        if not config_file:
-            if os.path.exists('config.local.yaml'):
-                config_file = 'config.local.yaml'
-            else:
-                config_file = 'config.yaml'
+        # Load configuration using the proper Config class methods
+        if config_path:
+            self.config_dict = Config.load_from_file(config_path)
+        else:
+            # Try local config first
+            self.config_dict = Config.load_local_config()
+            
+            # If no local config, try main config
+            if not self.config_dict and os.path.exists('config.yaml'):
+                self.config_dict = Config.load_from_file('config.yaml')
         
-        self.config = Config(config_file)
-        self.config_dict = self.config.get_config()
+        # Ensure we have a dict
+        if not self.config_dict:
+            self.config_dict = {}
         
         # Check for Gemini API key in various locations
+        gemini_config = self.config_dict.get('gemini', {})
         gemini_key = (self.config_dict.get('gemini_api_key') or 
-                     self.config_dict.get('gemini', {}).get('api_key') or
+                     (gemini_config.get('api_key') if isinstance(gemini_config, dict) else None) or
                      os.getenv('GOOGLE_API_KEY'))
         
         if not gemini_key:
@@ -60,7 +65,9 @@ class ScoreThresholdTuner:
         text_score_weight: float = 0.4,
         visual_score_weight: float = 0.3,
         max_frames_per_section: int = 3,
-        min_frame_spacing: float = 10.0
+        min_frame_spacing: float = 10.0,
+        save_frames: bool = False,
+        output_dir: str = None
     ) -> Dict:
         """Run a single experiment with given parameters."""
         
@@ -127,6 +134,37 @@ class ScoreThresholdTuner:
                     time_span = 0
                     coverage_percent = 0
                 
+                # Save frames if requested
+                saved_frames_info = []
+                if save_frames and output_dir and selected_frames:
+                    experiment_name = f"threshold_{score_threshold}_weights_{base_score_weight:.1f}_{text_score_weight:.1f}_{visual_score_weight:.1f}"
+                    experiment_dir = os.path.join(output_dir, experiment_name)
+                    os.makedirs(experiment_dir, exist_ok=True)
+                    
+                    print(f"   💾 Saving {total_frames} frames to: {experiment_dir}")
+                    
+                    for i, frame in enumerate(selected_frames):
+                        if 'path' in frame and os.path.exists(frame['path']):
+                            # Copy frame to experiment directory
+                            original_name = os.path.basename(frame['path'])
+                            new_name = f"{i+1:02d}_{frame['timestamp']:.1f}s_{frame.get('section_title', 'unknown').replace(' ', '_')}.jpg"
+                            dest_path = os.path.join(experiment_dir, new_name)
+                            
+                            try:
+                                shutil.copy2(frame['path'], dest_path)
+                                saved_frames_info.append({
+                                    'original_path': frame['path'],
+                                    'saved_path': dest_path,
+                                    'timestamp': frame['timestamp'],
+                                    'section': frame.get('section_title', 'Unknown'),
+                                    'score': frame.get('semantic_score', 0)
+                                })
+                            except Exception as copy_error:
+                                print(f"   ⚠️  Failed to copy frame {original_name}: {copy_error}")
+                    
+                    # Create summary HTML for easy viewing
+                    self._create_frame_summary_html(experiment_dir, saved_frames_info, experiment_name)
+                
                 return {
                     'parameters': {
                         'score_threshold': score_threshold,
@@ -146,7 +184,8 @@ class ScoreThresholdTuner:
                         'time_coverage_percent': coverage_percent,
                         'time_span_seconds': time_span,
                         'timestamps': timestamps[:10],  # First 10 for preview
-                        'score_distribution': score_distribution[:10]  # First 10 for preview
+                        'score_distribution': score_distribution[:10],  # First 10 for preview
+                        'saved_frames': saved_frames_info if save_frames else []
                     }
                 }
                 
@@ -163,6 +202,59 @@ class ScoreThresholdTuner:
                     'total_frames': 0
                 }
             }
+    
+    def _create_frame_summary_html(self, experiment_dir: str, frames_info: List[Dict], experiment_name: str):
+        """Create HTML summary for easy visual inspection of selected frames."""
+        html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Frame Selection Results - {experiment_name}</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
+        .header {{ background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }}
+        .frame-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }}
+        .frame-item {{ background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        .frame-image {{ width: 100%; height: 200px; object-fit: cover; border-radius: 4px; }}
+        .frame-info {{ margin-top: 10px; }}
+        .timestamp {{ font-weight: bold; color: #007acc; }}
+        .section {{ color: #666; font-style: italic; }}
+        .score {{ color: #28a745; font-weight: bold; }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Frame Selection Results</h1>
+        <h2>{experiment_name.replace('_', ' ').title()}</h2>
+        <p><strong>Total Frames:</strong> {len(frames_info)}</p>
+    </div>
+    <div class="frame-grid">
+"""
+        
+        for frame in frames_info:
+            filename = os.path.basename(frame['saved_path'])
+            html_content += f"""
+        <div class="frame-item">
+            <img src="{filename}" alt="Frame at {frame['timestamp']:.1f}s" class="frame-image">
+            <div class="frame-info">
+                <div class="timestamp">⏱️ {frame['timestamp']:.1f}s</div>
+                <div class="section">📋 {frame['section']}</div>
+                <div class="score">⭐ Score: {frame['score']:.1f}</div>
+            </div>
+        </div>
+"""
+        
+        html_content += """
+    </div>
+</body>
+</html>
+"""
+        
+        html_path = os.path.join(experiment_dir, "index.html")
+        with open(html_path, 'w') as f:
+            f.write(html_content)
+        
+        print(f"   🌐 Created visual summary: {html_path}")
     
     def run_threshold_sweep(
         self, 
@@ -247,7 +339,7 @@ class ScoreThresholdTuner:
         
         return results
     
-    def run_intelligent_variations(self, video_path: str, video_title: str) -> List[Dict]:
+    def run_intelligent_variations(self, video_path: str, video_title: str, save_frames: bool = False, output_dir: str = None) -> List[Dict]:
         """Run several intelligent variations designed to yield different useful results."""
         
         print(f"🎯 INTELLIGENT VARIATIONS: Testing different frame selection strategies")
@@ -322,7 +414,9 @@ class ScoreThresholdTuner:
                 base_score_weight=variation['base_weight'],
                 text_score_weight=variation['text_weight'],
                 visual_score_weight=variation['visual_weight'],
-                max_frames_per_section=variation['max_frames']
+                max_frames_per_section=variation['max_frames'],
+                save_frames=save_frames,
+                output_dir=output_dir
             )
             
             # Add variation info to result
@@ -419,6 +513,10 @@ def main():
     parser.add_argument('--fixed-threshold', type=float, default=50.0,
                        help='Fixed threshold for weight experiments (default: 50.0)')
     parser.add_argument('--output', help='Output JSON file for detailed results')
+    parser.add_argument('--save-frames', action='store_true', 
+                       help='Save selected frames as images for visual inspection')
+    parser.add_argument('--frames-dir', default='tuning_results',
+                       help='Directory to save frame images (default: tuning_results)')
     
     args = parser.parse_args()
     
@@ -443,7 +541,11 @@ def main():
             print("INTELLIGENT VARIATION EXPERIMENTS")
             print(f"{'='*60}")
             
-            smart_results = tuner.run_intelligent_variations(args.video, title)
+            smart_results = tuner.run_intelligent_variations(
+                args.video, title, 
+                save_frames=args.save_frames,
+                output_dir=args.frames_dir if args.save_frames else None
+            )
             all_results.extend(smart_results)
             
             # Save results if requested
@@ -451,6 +553,11 @@ def main():
                 with open(args.output, 'w') as f:
                     json.dump(smart_results, f, indent=2)
                 print(f"\n💾 Results saved to: {args.output}")
+            
+            # Show frame saving info
+            if args.save_frames:
+                print(f"\n📁 Frame images saved to: {args.frames_dir}/")
+                print(f"   Open the index.html files in each subdirectory to view results")
             
         elif args.mode in ['threshold', 'both']:
             print(f"\n{'='*60}")
