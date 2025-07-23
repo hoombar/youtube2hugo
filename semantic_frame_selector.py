@@ -262,6 +262,7 @@ class SemanticFrameScorer:
     
     def __init__(self, config: Dict):
         self.config = config
+        self.video_title = ""  # Will be set by select_frames_semantically
     
     def score_frame_for_section(self, frame_path: str, section: Dict) -> float:
         """Score a frame's relevance to a semantic section."""
@@ -342,16 +343,26 @@ class SemanticFrameScorer:
             text_lower = text.lower()
             
             # Title sequence detection - heavily penalize frames with title/intro indicators
-            title_indicators = [
-                'smart home ideas', 'subscribe', 'like and subscribe', 'channel',
+            generic_title_indicators = [
+                'subscribe', 'like and subscribe', 'channel',
                 'intro', 'introduction', 'welcome to', 'today we', 'today i',
-                'lightbulb', 'bulb', 'logo', 'brand', 'title', 'episode',
-                'part 1', 'part 2', 'tutorial series', 'coming up'
+                'logo', 'brand', 'episode', 'part 1', 'part 2', 
+                'tutorial series', 'coming up'
             ]
             
-            for indicator in title_indicators:
+            # Check for generic title sequence indicators
+            for indicator in generic_title_indicators:
                 if indicator in text_lower:
                     logger.debug(f"Title sequence detected: '{indicator}' found in frame text")
+                    return -50.0  # Heavy penalty for title sequence frames
+            
+            # Dynamic title sequence detection based on video title
+            if self.video_title:
+                title_words = self.video_title.lower().split()
+                # Check if significant portion of video title appears in frame text
+                title_matches = sum(1 for word in title_words if len(word) > 3 and word in text_lower)
+                if title_matches >= len(title_words) * 0.6:  # 60% of title words found
+                    logger.debug(f"Dynamic title sequence detected: {title_matches}/{len(title_words)} title words found")
                     return -50.0  # Heavy penalty for title sequence frames
             
             score = 0.0
@@ -474,11 +485,15 @@ class SemanticFrameSelector:
         self, 
         video_path: str, 
         transcript_segments: List[Dict], 
-        temp_dir: str
+        temp_dir: str,
+        video_title: str = None
     ) -> List[Dict]:
         """Select frames using semantic analysis of transcript content."""
         
         logger.info("🧠 Starting semantic frame selection...")
+        
+        # Store video title for title sequence detection
+        self.frame_scorer.video_title = video_title or ""
         
         # Step 1: Analyze transcript for semantic sections
         sections = self.section_analyzer.analyze_transcript_sections(transcript_segments)

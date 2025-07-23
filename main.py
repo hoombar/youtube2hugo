@@ -66,7 +66,7 @@ class YouTube2Hugo:
             # Extract and analyze video frames using semantic approach
             logger.info("Extracting video frames with semantic content analysis...")
             semantic_frames = self.semantic_frame_selector.select_frames_semantically(
-                video_path, transcript_segments, temp_dir
+                video_path, transcript_segments, temp_dir, title
             )
             
             # Optimize semantic frames (ensure proper formatting and optimization)

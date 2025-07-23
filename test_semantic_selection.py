@@ -120,8 +120,9 @@ class SemanticFrameSelectionTester:
             
             try:
                 # Run semantic frame selection
+                test_title = "Test Video Analysis"  # Could be extracted from video filename
                 selected_frames = semantic_selector.select_frames_semantically(
-                    self.video_path, transcript_segments, temp_dir
+                    self.video_path, transcript_segments, temp_dir, test_title
                 )
                 
                 # Copy selected frames to output directory
