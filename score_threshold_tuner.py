@@ -28,12 +28,28 @@ class ScoreThresholdTuner:
     
     def __init__(self, config_path: str = None):
         """Initialize with configuration."""
-        self.config = Config(config_path or 'config.yaml')
+        # Try local config first, then fallback to main config
+        config_file = config_path
+        if not config_file:
+            if os.path.exists('config.local.yaml'):
+                config_file = 'config.local.yaml'
+            else:
+                config_file = 'config.yaml'
+        
+        self.config = Config(config_file)
         self.config_dict = self.config.get_config()
         
-        # Ensure we have required API keys
-        if not self.config_dict.get('gemini_api_key') and not os.getenv('GOOGLE_API_KEY'):
-            raise ValueError("Gemini API key required. Set GOOGLE_API_KEY or configure in config file.")
+        # Check for Gemini API key in various locations
+        gemini_key = (self.config_dict.get('gemini_api_key') or 
+                     self.config_dict.get('gemini', {}).get('api_key') or
+                     os.getenv('GOOGLE_API_KEY'))
+        
+        if not gemini_key:
+            raise ValueError("Gemini API key required. Add to config.local.yaml or set GOOGLE_API_KEY environment variable.")
+        
+        # Ensure the config has the key for experiments
+        if 'gemini_api_key' not in self.config_dict:
+            self.config_dict['gemini_api_key'] = gemini_key
     
     def run_experiment(
         self, 
@@ -231,6 +247,102 @@ class ScoreThresholdTuner:
         
         return results
     
+    def run_intelligent_variations(self, video_path: str, video_title: str) -> List[Dict]:
+        """Run several intelligent variations designed to yield different useful results."""
+        
+        print(f"🎯 INTELLIGENT VARIATIONS: Testing different frame selection strategies")
+        
+        # Define sensible variations with different goals
+        variations = [
+            {
+                'name': 'Conservative (High Quality)',
+                'description': 'Fewer frames, higher quality threshold',
+                'threshold': 70.0,
+                'base_weight': 0.4,
+                'text_weight': 0.3,
+                'visual_weight': 0.3,
+                'max_frames': 2
+            },
+            {
+                'name': 'Balanced (Default)',
+                'description': 'Balanced approach for most content',
+                'threshold': 50.0,
+                'base_weight': 0.3,
+                'text_weight': 0.4,
+                'visual_weight': 0.3,
+                'max_frames': 3
+            },
+            {
+                'name': 'Liberal (More Coverage)',
+                'description': 'More frames, lower threshold for better coverage',
+                'threshold': 30.0,
+                'base_weight': 0.3,
+                'text_weight': 0.4,
+                'visual_weight': 0.3,
+                'max_frames': 4
+            },
+            {
+                'name': 'Text-Focused',
+                'description': 'Prioritizes frames with relevant text/code',
+                'threshold': 45.0,
+                'base_weight': 0.2,
+                'text_weight': 0.6,
+                'visual_weight': 0.2,
+                'max_frames': 3
+            },
+            {
+                'name': 'Visual-Focused',
+                'description': 'Prioritizes visual quality and UI elements',
+                'threshold': 45.0,
+                'base_weight': 0.5,
+                'text_weight': 0.2,
+                'visual_weight': 0.3,
+                'max_frames': 3
+            },
+            {
+                'name': 'Comprehensive',
+                'description': 'Maximum coverage with relaxed standards',
+                'threshold': 25.0,
+                'base_weight': 0.3,
+                'text_weight': 0.4,
+                'visual_weight': 0.3,
+                'max_frames': 5
+            }
+        ]
+        
+        results = []
+        
+        for i, variation in enumerate(variations):
+            print(f"\n📋 Variation {i+1}/{ len(variations)}: {variation['name']}")
+            print(f"   {variation['description']}")
+            
+            result = self.run_experiment(
+                video_path, video_title,
+                score_threshold=variation['threshold'],
+                base_score_weight=variation['base_weight'],
+                text_score_weight=variation['text_weight'],
+                visual_score_weight=variation['visual_weight'],
+                max_frames_per_section=variation['max_frames']
+            )
+            
+            # Add variation info to result
+            result['variation_name'] = variation['name']
+            result['variation_description'] = variation['description']
+            results.append(result)
+            
+            # Print summary
+            if 'error' not in result['results']:
+                frames = result['results']['total_frames']
+                sections = result['results']['sections_with_frames']
+                avg_score = result['results']['avg_score']
+                coverage = result['results']['time_coverage_percent']
+                print(f"   📊 Results: {frames} frames across {sections} sections")
+                print(f"      Coverage: {coverage:.1f}% | Avg Score: {avg_score:.1f}")
+            else:
+                print(f"   ❌ Error: {result['results']['error']}")
+        
+        return results
+    
     def analyze_results(self, results: List[Dict]) -> Dict:
         """Analyze experiment results to find optimal parameters."""
         
@@ -277,11 +389,17 @@ class ScoreThresholdTuner:
             results_data = result['results']
             
             print(f"\n   #{i+1} (Quality Score: {scored['quality_score']:.1f})")
+            
+            # Show variation name if available
+            if 'variation_name' in result:
+                print(f"      Strategy: {result['variation_name']}")
+                print(f"      Description: {result['variation_description']}")
+            
             print(f"      Threshold: {params['score_threshold']}")
             if 'base_score_weight' in params:
-                print(f"      Weights: ({params['base_score_weight']:.1f}, {params['text_score_weight']:.1f}, {params['visual_score_weight']:.1f})")
-            print(f"      Results: {results_data['total_frames']} frames, {results_data['sections_with_frames']} sections")
-            print(f"      Coverage: {results_data['time_coverage_percent']:.1f}%, Avg Score: {results_data['avg_score']:.1f}")
+                print(f"      Weights: Base={params['base_score_weight']:.1f}, Text={params['text_score_weight']:.1f}, Visual={params['visual_score_weight']:.1f}")
+            print(f"      Results: {results_data['total_frames']} frames across {results_data['sections_with_frames']} sections")
+            print(f"      Coverage: {results_data['time_coverage_percent']:.1f}% | Avg Score: {results_data['avg_score']:.1f}")
         
         return {
             'best_result': scored_results[0]['result'] if scored_results else None,
@@ -289,15 +407,15 @@ class ScoreThresholdTuner:
         }
 
 def main():
-    parser = argparse.ArgumentParser(description='Tune semantic frame selection scoring thresholds')
+    parser = argparse.ArgumentParser(description='Find optimal semantic frame selection settings')
     parser.add_argument('video', help='Path to video file')
     parser.add_argument('--title', help='Video title (default: derived from filename)')
-    parser.add_argument('--config', help='Config file path (default: config.yaml)')
-    parser.add_argument('--mode', choices=['threshold', 'weights', 'both'], default='both',
-                       help='Experiment mode (default: both)')
+    parser.add_argument('--config', help='Config file path (default: config.local.yaml or config.yaml)')
+    parser.add_argument('--mode', choices=['smart', 'threshold', 'weights', 'both'], default='smart',
+                       help='Experiment mode - smart runs intelligent variations (default: smart)')
     parser.add_argument('--threshold-range', nargs=3, type=float, default=[20.0, 80.0, 10.0],
                        metavar=('START', 'END', 'STEP'), 
-                       help='Threshold range: start end step (default: 20 80 10)')
+                       help='Threshold range for threshold mode: start end step (default: 20 80 10)')
     parser.add_argument('--fixed-threshold', type=float, default=50.0,
                        help='Fixed threshold for weight experiments (default: 50.0)')
     parser.add_argument('--output', help='Output JSON file for detailed results')
@@ -320,7 +438,21 @@ def main():
         
         all_results = []
         
-        if args.mode in ['threshold', 'both']:
+        if args.mode == 'smart':
+            print(f"\n{'='*60}")
+            print("INTELLIGENT VARIATION EXPERIMENTS")
+            print(f"{'='*60}")
+            
+            smart_results = tuner.run_intelligent_variations(args.video, title)
+            all_results.extend(smart_results)
+            
+            # Save results if requested
+            if args.output:
+                with open(args.output, 'w') as f:
+                    json.dump(smart_results, f, indent=2)
+                print(f"\n💾 Results saved to: {args.output}")
+            
+        elif args.mode in ['threshold', 'both']:
             print(f"\n{'='*60}")
             print("THRESHOLD SWEEP EXPERIMENTS")
             print(f"{'='*60}")
@@ -350,13 +482,30 @@ def main():
         if analysis.get('best_result'):
             best = analysis['best_result']
             print(f"\n✅ RECOMMENDED CONFIGURATION:")
-            print(f"   Add to your config.yaml:")
+            
+            if 'variation_name' in best:
+                print(f"   Best Strategy: {best['variation_name']}")
+                print(f"   {best['variation_description']}")
+                print(f"\n   Add this to your config.local.yaml or config.yaml:")
+            else:
+                print(f"   Add this to your config.local.yaml or config.yaml:")
+                
             print(f"   semantic_frame_selection:")
             print(f"     score_threshold: {best['parameters']['score_threshold']}")
             if 'base_score_weight' in best['parameters']:
                 print(f"     base_score_weight: {best['parameters']['base_score_weight']}")
                 print(f"     text_score_weight: {best['parameters']['text_score_weight']}")  
                 print(f"     visual_score_weight: {best['parameters']['visual_score_weight']}")
+                print(f"     max_frames_per_section: {best['parameters'].get('max_frames_per_section', 3)}")
+            
+            # Show what this will achieve
+            r = best['results']
+            print(f"\n   Expected Results:")
+            print(f"     • {r['total_frames']} frames across {r['sections_with_frames']} sections")
+            print(f"     • {r['time_coverage_percent']:.1f}% video coverage")
+            print(f"     • Average frame quality score: {r['avg_score']:.1f}")
+        else:
+            print(f"\n❌ No suitable configuration found. Try running with --mode threshold to find working parameters.")
         
     except Exception as e:
         print(f"❌ Error: {e}")
