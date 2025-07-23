@@ -1,0 +1,26 @@
+# Example configuration for score threshold tuning
+# Copy values from your main config.yaml
+
+gemini_api_key: "your-gemini-api-key-here"
+gemini_model: "gemini-2.5-flash"
+
+# These values will be overridden by the tuning script
+semantic_frame_selection:
+  score_threshold: 50.0
+  base_score_weight: 0.3
+  text_score_weight: 0.4  
+  visual_score_weight: 0.3
+  max_frames_per_section: 3
+  min_frame_spacing: 10.0
+
+# Video processing settings (used by the tuner)
+video_processing:
+  frame_extraction_interval: 15
+  max_frames_total: 50
+  min_visual_score: 200
+
+# Image processing
+image_optimization:
+  target_width: 800
+  quality: 85
+  format: "JPEG"

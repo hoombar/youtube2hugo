@@ -263,6 +263,13 @@ class SemanticFrameScorer:
     def __init__(self, config: Dict):
         self.config = config
         self.video_title = ""  # Will be set by select_frames_semantically
+        
+        # Configurable scoring weights
+        semantic_config = config.get('semantic_frame_selection', {})
+        self.base_score_weight = semantic_config.get('base_score_weight', 0.3)
+        self.text_score_weight = semantic_config.get('text_score_weight', 0.4)
+        self.visual_score_weight = semantic_config.get('visual_score_weight', 0.3)
+        self.score_threshold = semantic_config.get('score_threshold', 50.0)
     
     def score_frame_for_section(self, frame_path: str, section: Dict) -> float:
         """Score a frame's relevance to a semantic section."""
@@ -277,15 +284,15 @@ class SemanticFrameScorer:
             
             # Base visual quality score (from existing algorithm)
             base_score = self._get_base_visual_score(frame)
-            total_score += base_score * 0.3  # 30% weight for base quality
+            total_score += base_score * self.base_score_weight
             
             # OCR-based text matching
             text_score = self._score_text_relevance(frame, section)
-            total_score += text_score * 0.4  # 40% weight for text relevance
+            total_score += text_score * self.text_score_weight
             
             # Visual element matching
             visual_score = self._score_visual_elements(frame, section)
-            total_score += visual_score * 0.3  # 30% weight for visual elements
+            total_score += visual_score * self.visual_score_weight
             
             # Importance multiplier
             importance_multiplier = {'high': 1.2, 'medium': 1.0, 'low': 0.8}
@@ -583,11 +590,11 @@ class SemanticFrameSelector:
         
         selected_frames = []
         for score, frame_info in scored_frames[:max_frames]:
-            if score > 50:  # Minimum semantic relevance threshold
+            if score > self.frame_scorer.score_threshold:
                 selected_frames.append(frame_info)
                 logger.info(f"   ✅ Selected frame {frame_info['timestamp']:.1f}s (score: {score:.1f})")
             else:
-                logger.info(f"   ❌ Rejected frame {frame_info['timestamp']:.1f}s (score: {score:.1f} too low)")
+                logger.info(f"   ❌ Rejected frame {frame_info['timestamp']:.1f}s (score: {score:.1f} < {self.frame_scorer.score_threshold})")
         
         return selected_frames
     
@@ -692,11 +699,11 @@ class SemanticFrameSelector:
             logger.info(f"   📊 Top frame scores: {[f'{s:.1f}' for s, f in scored_frames[:5]]}")
         
         for score, frame_info in scored_frames[:max_frames]:
-            if score > min_threshold:
+            if score > self.frame_scorer.score_threshold:
                 selected_frames.append(frame_info)
                 logger.info(f"   ✅ Selected frame {frame_info['timestamp']:.1f}s (score: {score:.1f})")
             else:
-                logger.info(f"   ❌ Rejected frame {frame_info['timestamp']:.1f}s (score: {score:.1f} < {min_threshold})")
+                logger.info(f"   ❌ Rejected frame {frame_info['timestamp']:.1f}s (score: {score:.1f} < {self.frame_scorer.score_threshold})")
         
         # If no frames meet threshold, take the best one anyway (fallback)
         if not selected_frames and scored_frames:
