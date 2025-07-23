@@ -11,9 +11,13 @@ import sys
 import json
 import tempfile
 import shutil
+import logging
 from typing import Dict, List, Tuple
 import argparse
 from pathlib import Path
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 # Add project root to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -60,6 +64,8 @@ class ScoreThresholdTuner:
         self, 
         video_path: str, 
         video_title: str,
+        transcript_segments: List[Dict],
+        semantic_sections: List[Dict],
         score_threshold: float,
         base_score_weight: float = 0.3,
         text_score_weight: float = 0.4,
@@ -88,11 +94,7 @@ class ScoreThresholdTuner:
         
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
-                # Extract transcript
-                transcript_extractor = TranscriptExtractor(experimental_config)
-                transcript_segments = transcript_extractor.extract_transcript(video_path)
-                
-                # Run semantic frame selection
+                # Use pre-extracted transcript and sections
                 video_processor = VideoProcessor(experimental_config)
                 semantic_selector = SemanticFrameSelector(experimental_config, video_processor)
                 
@@ -100,9 +102,11 @@ class ScoreThresholdTuner:
                 semantic_selector.frame_scorer.base_score_weight = base_score_weight
                 semantic_selector.frame_scorer.text_score_weight = text_score_weight
                 semantic_selector.frame_scorer.visual_score_weight = visual_score_weight
+                semantic_selector.frame_scorer.score_threshold = score_threshold
                 
-                selected_frames = semantic_selector.select_frames_semantically(
-                    video_path, transcript_segments, temp_dir, video_title
+                # Run frame selection using pre-computed sections (skip transcript analysis)
+                selected_frames = self._run_frame_selection_with_sections(
+                    semantic_selector, video_path, transcript_segments, semantic_sections, temp_dir, video_title
                 )
                 
                 # Analyze results
@@ -256,6 +260,69 @@ class ScoreThresholdTuner:
         
         print(f"   🌐 Created visual summary: {html_path}")
     
+    def _run_frame_selection_with_sections(
+        self, 
+        semantic_selector: 'SemanticFrameSelector',
+        video_path: str,
+        transcript_segments: List[Dict],
+        semantic_sections: List[Dict],
+        temp_dir: str,
+        video_title: str
+    ) -> List[Dict]:
+        """Run frame selection using pre-computed semantic sections."""
+        
+        # Set the video title for title sequence detection
+        semantic_selector.frame_scorer.video_title = video_title or ""
+        
+        # Skip section analysis and jump straight to frame processing
+        logger.info(f"📋 Using {len(semantic_sections)} pre-computed semantic sections")
+        
+        # Extract and score all candidate frames 
+        all_frames = semantic_selector._extract_all_candidate_frames(
+            video_path, semantic_sections, temp_dir
+        )
+        
+        # Select best frames for each section
+        selected_frames = []
+        for section in semantic_sections:
+            section_frames = semantic_selector._select_frames_for_section(
+                section, all_frames
+            )
+            selected_frames.extend(section_frames)
+        
+        # Remove duplicates and sort by timestamp
+        seen_timestamps = set()
+        unique_frames = []
+        for frame in selected_frames:
+            timestamp = frame['timestamp']
+            if timestamp not in seen_timestamps:
+                unique_frames.append(frame)
+                seen_timestamps.add(timestamp)
+        
+        unique_frames.sort(key=lambda x: x['timestamp'])
+        return unique_frames
+    
+    def _extract_transcript_and_sections(self, video_path: str, video_title: str) -> Tuple[List[Dict], List[Dict]]:
+        """Extract transcript and semantic sections once for reuse across experiments."""
+        
+        print(f"🎬 Extracting transcript and analyzing semantic sections...")
+        
+        # Extract transcript
+        transcript_extractor = TranscriptExtractor(self.config_dict)
+        transcript_segments = transcript_extractor.extract_transcript(video_path)
+        print(f"   📝 Extracted {len(transcript_segments)} transcript segments")
+        
+        # Analyze semantic sections
+        from semantic_frame_selector import SemanticSectionAnalyzer
+        section_analyzer = SemanticSectionAnalyzer(self.config_dict)
+        semantic_sections = section_analyzer.analyze_transcript_sections(transcript_segments)
+        print(f"   🧠 Identified {len(semantic_sections)} semantic sections")
+        
+        for i, section in enumerate(semantic_sections):
+            print(f"      Section {i+1}: {section['start_time']:.1f}s-{section['end_time']:.1f}s - {section['title']}")
+        
+        return transcript_segments, semantic_sections
+    
     def run_threshold_sweep(
         self, 
         video_path: str, 
@@ -344,6 +411,9 @@ class ScoreThresholdTuner:
         
         print(f"🎯 INTELLIGENT VARIATIONS: Testing different frame selection strategies")
         
+        # Extract transcript and semantic sections once for all experiments
+        transcript_segments, semantic_sections = self._extract_transcript_and_sections(video_path, video_title)
+        
         # Define sensible variations with different goals
         variations = [
             {
@@ -410,6 +480,7 @@ class ScoreThresholdTuner:
             
             result = self.run_experiment(
                 video_path, video_title,
+                transcript_segments, semantic_sections,
                 score_threshold=variation['threshold'],
                 base_score_weight=variation['base_weight'],
                 text_score_weight=variation['text_weight'],
