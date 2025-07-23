@@ -430,20 +430,29 @@ class ScoreThresholdTuner:
         # Extract transcript and semantic sections once for all experiments
         transcript_segments, semantic_sections = self._extract_transcript_and_sections(video_path, video_title)
         
-        # Define sensible variations with different goals
+        # Define variations with more dramatic differences for meaningful comparison
         variations = [
             {
-                'name': 'Conservative (High Quality)',
-                'description': 'Fewer frames, higher quality threshold',
-                'threshold': 70.0,
+                'name': 'Ultra Conservative',
+                'description': 'Only the highest quality frames',
+                'threshold': 90.0,
+                'base_weight': 0.5,
+                'text_weight': 0.3,
+                'visual_weight': 0.2,
+                'max_frames': 1
+            },
+            {
+                'name': 'High Quality',
+                'description': 'Strict quality with moderate coverage',
+                'threshold': 75.0,
                 'base_weight': 0.4,
                 'text_weight': 0.3,
                 'visual_weight': 0.3,
                 'max_frames': 2
             },
             {
-                'name': 'Balanced (Default)',
-                'description': 'Balanced approach for most content',
+                'name': 'Balanced',
+                'description': 'Good balance of quality and coverage',
                 'threshold': 50.0,
                 'base_weight': 0.3,
                 'text_weight': 0.4,
@@ -451,40 +460,31 @@ class ScoreThresholdTuner:
                 'max_frames': 3
             },
             {
-                'name': 'Liberal (More Coverage)',
-                'description': 'More frames, lower threshold for better coverage',
-                'threshold': 30.0,
+                'name': 'High Coverage',
+                'description': 'More frames with reasonable quality',
+                'threshold': 25.0,
                 'base_weight': 0.3,
                 'text_weight': 0.4,
                 'visual_weight': 0.3,
                 'max_frames': 4
             },
             {
-                'name': 'Text-Focused',
-                'description': 'Prioritizes frames with relevant text/code',
-                'threshold': 45.0,
-                'base_weight': 0.2,
-                'text_weight': 0.6,
-                'visual_weight': 0.2,
-                'max_frames': 3
-            },
-            {
-                'name': 'Visual-Focused',
-                'description': 'Prioritizes visual quality and UI elements',
-                'threshold': 45.0,
-                'base_weight': 0.5,
-                'text_weight': 0.2,
-                'visual_weight': 0.3,
-                'max_frames': 3
-            },
-            {
-                'name': 'Comprehensive',
-                'description': 'Maximum coverage with relaxed standards',
-                'threshold': 25.0,
+                'name': 'Maximum Coverage',
+                'description': 'Maximum frames with minimal quality bar',
+                'threshold': 10.0,
                 'base_weight': 0.3,
                 'text_weight': 0.4,
                 'visual_weight': 0.3,
-                'max_frames': 5
+                'max_frames': 6
+            },
+            {
+                'name': 'Text-Heavy Strategy',
+                'description': 'Heavy preference for text/code content',
+                'threshold': 35.0,
+                'base_weight': 0.1,
+                'text_weight': 0.8,
+                'visual_weight': 0.1,
+                'max_frames': 3
             }
         ]
         
