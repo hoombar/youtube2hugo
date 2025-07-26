@@ -887,24 +887,24 @@ document.addEventListener('keydown', function(event) {
                 grid_style = f"display: flex; flex-wrap: wrap; justify-content: center; gap: {gap_size}; margin: 20px 0;"
                 img_width = "calc(25% - 5px)"
         else:
-            # Standard CSS Grid with centered layout
+            # Standard CSS with right-float layout for text wrapping
             if num_images == 1:
                 grid_class = "image-grid-1"
-                grid_style = f"display: flex; justify-content: center; gap: {gap_size}; margin: 20px 0;"
-                img_width = "50%"
+                grid_style = f"display: flex; justify-content: center; gap: {gap_size}; margin-left: 20px; margin-bottom: 15px; margin-top: 10px; width: 50%; float: right;"
+                img_width = "100%"
             elif num_images == 2:
                 grid_class = "image-grid-2"
-                grid_style = f"display: flex; justify-content: center; gap: {gap_size}; margin: 20px 0;"
-                img_width = "25%"
+                grid_style = f"display: flex; justify-content: center; gap: {gap_size}; margin-left: 20px; margin-bottom: 15px; margin-top: 10px; width: 50%; float: right;"
+                img_width = "calc(50% - 2.5px)"
             elif num_images == 3:
                 grid_class = "image-grid-3"
-                grid_style = f"display: flex; justify-content: center; gap: {gap_size}; margin: 20px 0;"
-                img_width = "16.666%"
+                grid_style = f"display: flex; justify-content: center; gap: {gap_size}; margin-left: 20px; margin-bottom: 15px; margin-top: 10px; width: 50%; float: right;"
+                img_width = "calc(33.333% - 3.33px)"
             else:
                 # Fallback for 4+ images (shouldn't happen with 3-image limit)
                 grid_class = "image-grid-flex"
-                grid_style = f"display: flex; flex-wrap: wrap; justify-content: center; gap: {gap_size}; margin: 20px 0;"
-                img_width = "calc(25% - 5px)"
+                grid_style = f"display: flex; flex-wrap: wrap; justify-content: center; gap: {gap_size}; margin-left: 20px; margin-bottom: 15px; margin-top: 10px; width: 50%; float: right;"
+                img_width = f"calc({100/num_images:.1f}% - {5*num_images/num_images:.1f}px)"
         
         # Generate individual image elements
         image_elements = []
@@ -925,16 +925,16 @@ document.addEventListener('keydown', function(event) {
                     )
             else:
                 # HTML img tag with click-to-enlarge modal functionality
-                img_style = f"width: {img_width} !important; height: auto !important; object-fit: cover; border-radius: {border_radius}; display: block !important; max-width: {img_width} !important; margin: 0 !important; padding: 0 !important; cursor: pointer !important;"
+                img_style = f"width: {img_width} !important; height: auto !important; object-fit: cover; border-radius: {border_radius}; display: block !important; margin: 0 !important; padding: 0 !important; cursor: pointer !important;"
                 caption_style = "font-size: 0.8em !important; color: #666 !important; text-align: center !important; margin-top: 5px !important; margin-bottom: 0 !important; padding: 0 !important;"
                 
                 if show_timestamps:
-                    image_elements.append(f'''<div class="grid-item">
+                    image_elements.append(f'''<div class="grid-item" style="margin: 0 !important; padding: 0 !important;">
     <img src="{image_path}" alt="{alt_text}" style="{img_style}" onclick="openImageModal('{image_path}', '{alt_text}')">
     <div style="{caption_style}">{timestamp:.1f}s</div>
 </div>''')
                 else:
-                    image_elements.append(f'''<div class="grid-item">
+                    image_elements.append(f'''<div class="grid-item" style="margin: 0 !important; padding: 0 !important;">
     <img src="{image_path}" alt="{alt_text}" style="{img_style}" onclick="openImageModal('{image_path}', '{alt_text}')">
 </div>''')
         
@@ -1378,13 +1378,14 @@ document.addEventListener('keydown', function(event) {
             return self._generate_semantic_frame_markdown_for_formatted_content(frames[0])
         
         # Calculate width for each image based on count
+        # Since the container is 50% and floated right, images should fill the container
         num_images = len(frames)
         if num_images == 2:
-            img_width = "25%"
+            img_width = "calc(50% - 2.5px)"  # Account for 5px gap between images
         elif num_images == 3:
-            img_width = "16.666%"
+            img_width = "calc(33.333% - 3.33px)"  # Account for gaps
         else:
-            img_width = f"{50/num_images:.1f}%"  # Fallback for 4+ images
+            img_width = f"calc({100/num_images:.1f}% - {5*num_images/num_images:.1f}px)"  # Fallback
         
         # Generate individual image elements
         image_elements = []
@@ -1398,17 +1399,18 @@ document.addEventListener('keydown', function(event) {
                 image_elements.append(f'{{{{< figure src="{image_path}" alt="{alt_text}" caption="{timestamp:.1f}s" class="grid-image" width="{img_width}" >}}}}')
             else:
                 # HTML img tag with horizontal layout styling
-                img_style = f"width: {img_width} !important; height: auto !important; object-fit: cover; border-radius: 4px; display: inline-block !important; margin: 0 5px 10px 0 !important; cursor: pointer !important;"
+                img_style = f"width: {img_width} !important; height: auto !important; object-fit: cover; border-radius: 4px; display: block !important; margin: 0 !important; cursor: pointer !important;"
                 image_elements.append(f'<img src="{image_path}" alt="{alt_text}" style="{img_style}" title="{section_title} at {timestamp:.1f}s" onclick="openImageModal(\'{image_path}\', \'{alt_text}\')">')
         
-        # Wrap in container for horizontal layout
+        # Wrap in container for horizontal layout with right float
         if self.config.get('use_hugo_shortcodes', False):
-            return f'''{{{{< image-grid columns="{num_images}" >}}}}
+            return f'''{{{{< image-grid columns="{num_images}" class="float-right" >}}}}
 {chr(10).join(image_elements)}
 {{{{< /image-grid >}}}}'''
         else:
-            # Use flexbox container for horizontal layout
-            container_style = f"display: flex; justify-content: center; gap: 10px; margin: 20px 0; flex-wrap: wrap;"
+            # Use flexbox container that floats right and allows text wrapping
+            # Total width is still 50% but split among multiple images
+            container_style = f"display: flex; justify-content: center; gap: 5px; margin-left: 20px; margin-bottom: 15px; margin-top: 10px; width: 50%; float: right; flex-wrap: wrap;"
             return f'''<div style="{container_style}">
 {chr(10).join(image_elements)}
 </div>'''
