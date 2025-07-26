@@ -441,6 +441,7 @@
     <script>
         let sessionData = null;
         let selectedFrames = {};
+        let updateTimeouts = {}; // For throttling DOM updates
         
         async function processVideo() {
             const videoPath = document.getElementById('video-path').value.trim();
@@ -622,27 +623,50 @@
             }
             
             updateSelectionSummary();
-            updateParagraphCounters();
+            
+            // Only update the specific paragraph that was affected
+            updateSingleParagraphCounter(sectionIndex, paragraphIndex);
         }
         
         function getCurrentParagraphSelectedFrames(sectionIndex, paragraphIndex) {
-            if (!sessionData || !sessionData.sections[sectionIndex] || !sessionData.sections[sectionIndex].paragraphs) {
+            // Safety checks to prevent errors
+            if (!sessionData || !sessionData.sections || !sessionData.sections[sectionIndex]) {
                 return [];
             }
             
-            const paragraph = sessionData.sections[sectionIndex].paragraphs[paragraphIndex];
-            const frameData = sessionData.frames_data[sectionIndex];
+            const section = sessionData.sections[sectionIndex];
+            if (!section.paragraphs || !section.paragraphs[paragraphIndex]) {
+                return [];
+            }
             
-            // Get frames for this paragraph's time range
+            const paragraph = section.paragraphs[paragraphIndex];
+            const frameData = sessionData.frames_data && sessionData.frames_data[sectionIndex];
+            if (!frameData || !frameData.frames) {
+                return [];
+            }
+            
+            // Safety check for selectedFrames
+            if (!selectedFrames[sectionIndex]) {
+                selectedFrames[sectionIndex] = [];
+                return [];
+            }
+            
+            // Get frames for this paragraph's time range (optimized)
             const paragraphFrameIndices = [];
-            frameData.frames.forEach((frame, frameIndex) => {
-                if (frame.timestamp >= paragraph.start_time && frame.timestamp <= paragraph.end_time) {
-                    paragraphFrameIndices.push(frameIndex);
+            const frames = frameData.frames;
+            const startTime = paragraph.start_time;
+            const endTime = paragraph.end_time;
+            
+            for (let i = 0; i < frames.length; i++) {
+                const frame = frames[i];
+                if (frame && frame.timestamp >= startTime && frame.timestamp <= endTime) {
+                    paragraphFrameIndices.push(i);
                 }
-            });
+            }
             
             // Filter to only selected frames in this paragraph
-            return selectedFrames[sectionIndex].filter(frameIndex => 
+            const selectedInSection = selectedFrames[sectionIndex];
+            return selectedInSection.filter(frameIndex => 
                 paragraphFrameIndices.includes(frameIndex)
             );
         }
@@ -650,55 +674,103 @@
         function updateParagraphCounters() {
             if (!sessionData) return;
             
-            sessionData.sections.forEach((section, sectionIndex) => {
-                const paragraphs = section.paragraphs || [section];
-                paragraphs.forEach((paragraph, paragraphIndex) => {
-                    const selectedCount = getCurrentParagraphSelectedFrames(sectionIndex, paragraphIndex).length;
-                    const counterElement = document.getElementById(`paragraph-counter-${sectionIndex}-${paragraphIndex}`);
-                    const paragraphSection = counterElement?.closest('.paragraph-section');
-                    
-                    if (counterElement) {
-                        counterElement.textContent = `${selectedCount}/3 selected`;
-                        
-                        // Update counter styling
-                        if (selectedCount >= 3) {
-                            counterElement.classList.add('max-reached');
-                            counterElement.classList.remove('paragraph-counter');
-                            counterElement.className = 'paragraph-counter max-reached';
-                        } else {
-                            counterElement.classList.remove('max-reached');
-                            counterElement.className = 'paragraph-counter';
-                        }
-                        
-                        // Update paragraph section styling
-                        if (paragraphSection) {
-                            if (selectedCount >= 3) {
-                                paragraphSection.classList.add('max-reached');
-                            } else {
-                                paragraphSection.classList.remove('max-reached');
-                            }
-                        }
-                        
-                        // Disable/enable unselected frames in this paragraph
-                        updateFrameDisabledState(sectionIndex, paragraphIndex, selectedCount >= 3);
-                    }
+            // Use requestAnimationFrame to prevent blocking the browser
+            requestAnimationFrame(() => {
+                sessionData.sections.forEach((section, sectionIndex) => {
+                    const paragraphs = section.paragraphs || [section];
+                    paragraphs.forEach((paragraph, paragraphIndex) => {
+                        updateSingleParagraphCounter(sectionIndex, paragraphIndex);
+                    });
                 });
             });
         }
         
-        function updateFrameDisabledState(sectionIndex, paragraphIndex, isMaxReached) {
-            if (!sessionData || !sessionData.sections[sectionIndex] || !sessionData.sections[sectionIndex].paragraphs) {
+        function updateSingleParagraphCounter(sectionIndex, paragraphIndex) {
+            const updateKey = `${sectionIndex}-${paragraphIndex}`;
+            
+            // Clear any existing timeout for this paragraph
+            if (updateTimeouts[updateKey]) {
+                clearTimeout(updateTimeouts[updateKey]);
+            }
+            
+            // Throttle updates to prevent rapid DOM manipulation
+            updateTimeouts[updateKey] = setTimeout(() => {
+                const selectedCount = getCurrentParagraphSelectedFrames(sectionIndex, paragraphIndex).length;
+                const counterElement = document.getElementById(`paragraph-counter-${sectionIndex}-${paragraphIndex}`);
+                
+                if (!counterElement) return;
+                
+                const paragraphSection = counterElement.closest('.paragraph-section');
+                
+                // Update counter text
+                counterElement.textContent = `${selectedCount}/3 selected`;
+                
+                // Update counter styling
+                if (selectedCount >= 3) {
+                    counterElement.className = 'paragraph-counter max-reached';
+                } else {
+                    counterElement.className = 'paragraph-counter';
+                }
+                
+                // Update paragraph section styling
+                if (paragraphSection) {
+                    if (selectedCount >= 3) {
+                        paragraphSection.classList.add('max-reached');
+                    } else {
+                        paragraphSection.classList.remove('max-reached');
+                    }
+                }
+                
+                // Update frame disabled state for this paragraph only (throttled)
+                updateFrameDisabledStateForParagraph(sectionIndex, paragraphIndex, selectedCount >= 3);
+                
+                // Clean up timeout reference
+                delete updateTimeouts[updateKey];
+            }, 50); // 50ms throttle
+        }
+        
+        function updateFrameDisabledStateForParagraph(sectionIndex, paragraphIndex, isMaxReached) {
+            // Safety checks to prevent infinite loops
+            if (!sessionData || !sessionData.sections || !sessionData.frames_data) {
                 return;
             }
             
-            const paragraph = sessionData.sections[sectionIndex].paragraphs[paragraphIndex];
+            const section = sessionData.sections[sectionIndex];
             const frameData = sessionData.frames_data[sectionIndex];
             
-            // Find all frame elements in this paragraph
-            frameData.frames.forEach((frame, frameIndex) => {
-                if (frame.timestamp >= paragraph.start_time && frame.timestamp <= paragraph.end_time) {
-                    const frameElement = document.querySelector(`[onclick*="toggleFrameSelection(${sectionIndex}, ${frameIndex}"]`);
-                    const isSelected = selectedFrames[sectionIndex].includes(frameIndex);
+            if (!section || !section.paragraphs || !section.paragraphs[paragraphIndex] || !frameData || !frameData.frames) {
+                return;
+            }
+            
+            const paragraph = section.paragraphs[paragraphIndex];
+            
+            // Limit the number of frames we process to prevent performance issues
+            if (frameData.frames.length > 500) {
+                console.warn('Too many frames to process efficiently, skipping disabled state update');
+                return;
+            }
+            
+            // Cache DOM queries by building a more specific selector
+            const paragraphContainer = document.querySelector(`.paragraph-section:nth-child(${paragraphIndex + 1})`);
+            if (!paragraphContainer) return;
+            
+            // Process frames in smaller batches to prevent blocking
+            const frames = frameData.frames;
+            const startTime = paragraph.start_time;
+            const endTime = paragraph.end_time;
+            const selectedInSection = selectedFrames[sectionIndex] || [];
+            
+            // Use requestAnimationFrame for non-blocking processing
+            requestAnimationFrame(() => {
+                for (let frameIndex = 0; frameIndex < frames.length; frameIndex++) {
+                    const frame = frames[frameIndex];
+                    if (!frame || frame.timestamp < startTime || frame.timestamp > endTime) {
+                        continue;
+                    }
+                    
+                    // Use a more specific selector within the paragraph container
+                    const frameElement = paragraphContainer.querySelector(`[onclick*="toggleFrameSelection(${sectionIndex}, ${frameIndex}"]`);
+                    const isSelected = selectedInSection.includes(frameIndex);
                     
                     if (frameElement && !isSelected) {
                         if (isMaxReached) {
