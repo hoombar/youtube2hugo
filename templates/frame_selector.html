@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frame Selection Trainer</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        
+        .step {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .step h2 {
+            margin-top: 0;
+            color: #333;
+            font-size: 1.5em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .input-group input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .input-group input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+        }
+        
+        .btn-analyze {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .section {
+            background: #f9f9f9;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+        
+        .section-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+        
+        .section-content {
+            padding: 20px;
+        }
+        
+        .frames-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .frame-item {
+            border: 3px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: white;
+        }
+        
+        .frame-item:hover {
+            border-color: #667eea;
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .frame-item.selected {
+            border-color: #4CAF50;
+            background: #f0fff0;
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+        }
+        
+        .frame-item img {
+            width: 100%;
+            height: auto;
+            border-radius: 5px;
+            margin-bottom: 8px;
+        }
+        
+        .frame-info {
+            font-size: 0.9em;
+            color: #666;
+        }
+        
+        .selection-summary {
+            background: #e8f5e8;
+            border: 2px solid #4CAF50;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .selection-summary h3 {
+            margin: 0 0 15px 0;
+            color: #2e7d32;
+        }
+        
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #2e7d32;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        
+        .analysis-results {
+            background: #fff3e0;
+            border: 2px solid #ff9800;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .analysis-results h3 {
+            margin: 0 0 15px 0;
+            color: #f57c00;
+        }
+        
+        .recommendations {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .recommendations li {
+            background: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border-left: 4px solid #ff9800;
+        }
+        
+        .error {
+            background: #ffebee;
+            border: 2px solid #f44336;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        
+        .success {
+            background: #e8f5e8;
+            border: 2px solid #4CAF50;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 Frame Selection Trainer</h1>
+        <p>Train the algorithm by selecting the best frames from your video</p>
+    </div>
+
+    <!-- Step 1: Video Processing -->
+    <div class="step" id="step1">
+        <h2>📹 Step 1: Process Video</h2>
+        <div class="input-group">
+            <label for="video-path">Video File Path:</label>
+            <input type="text" id="video-path" placeholder="/path/to/your/video.mp4">
+        </div>
+        <button class="btn" onclick="processVideo()" id="process-btn">Process Video</button>
+        
+        <div id="processing-status" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Processing video... This may take a few minutes.</p>
+            <p><small>Extracting transcript → Generating sections → Extracting frames</small></p>
+        </div>
+    </div>
+
+    <!-- Step 2: Frame Selection -->
+    <div class="step" id="step2" style="display: none;">
+        <h2>🖼️ Step 2: Select Best Frames</h2>
+        <p>Click on the frames you think are best for each section. Aim for 2-4 frames per section.</p>
+        
+        <div id="sections-container"></div>
+        
+        <div class="selection-summary" id="selection-summary" style="display: none;">
+            <h3>📊 Selection Summary</h3>
+            <div class="summary-stats" id="summary-stats"></div>
+            <button class="btn btn-success" onclick="saveSelections()" id="save-btn">💾 Save Selections</button>
+        </div>
+    </div>
+
+    <!-- Step 3: Analysis -->
+    <div class="step" id="step3" style="display: none;">
+        <h2>🔬 Step 3: Analyze & Improve</h2>
+        <p>Analyze your selections to improve the automatic algorithm.</p>
+        <button class="btn btn-analyze" onclick="analyzeSelections()" id="analyze-btn">🧠 Analyze Selections</button>
+        
+        <div id="analysis-results" class="analysis-results" style="display: none;"></div>
+    </div>
+
+    <script>
+        let sessionData = null;
+        let selectedFrames = {};
+        
+        async function processVideo() {
+            const videoPath = document.getElementById('video-path').value.trim();
+            if (!videoPath) {
+                alert('Please enter a video file path');
+                return;
+            }
+            
+            const processBtn = document.getElementById('process-btn');
+            const processingStatus = document.getElementById('processing-status');
+            
+            processBtn.disabled = true;
+            processingStatus.style.display = 'block';
+            
+            try {
+                const response = await fetch('/process_video', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to process video');
+                }
+                
+                sessionData = await response.json();
+                showFrameSelection();
+                
+            } catch (error) {
+                showError('Error processing video: ' + error.message);
+            } finally {
+                processBtn.disabled = false;
+                processingStatus.style.display = 'none';
+            }
+        }
+        
+        function showFrameSelection() {
+            document.getElementById('step2').style.display = 'block';
+            
+            const container = document.getElementById('sections-container');
+            container.innerHTML = '';
+            
+            sessionData.sections_with_frames.forEach((section, sectionIndex) => {
+                const sectionDiv = document.createElement('div');
+                sectionDiv.className = 'section';
+                
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'section-header';
+                headerDiv.innerHTML = `
+                    ${section.title} 
+                    <small>(${section.frame_count} frames available)</small>
+                `;
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'section-content';
+                
+                if (section.frames.length === 0) {
+                    contentDiv.innerHTML = '<p style="color: #999; font-style: italic;">No frames available for this section</p>';
+                } else {
+                    const framesGrid = document.createElement('div');
+                    framesGrid.className = 'frames-grid';
+                    
+                    section.frames.forEach((frame, frameIndex) => {
+                        const frameDiv = document.createElement('div');
+                        frameDiv.className = 'frame-item';
+                        frameDiv.onclick = () => toggleFrameSelection(sectionIndex, frameIndex, frameDiv);
+                        
+                        frameDiv.innerHTML = `
+                            <img src="/images/${frame.filename}" alt="Frame at ${frame.timestamp}s">
+                            <div class="frame-info">
+                                ${frame.timestamp.toFixed(1)}s
+                            </div>
+                        `;
+                        
+                        framesGrid.appendChild(frameDiv);
+                    });
+                    
+                    contentDiv.appendChild(framesGrid);
+                }
+                
+                sectionDiv.appendChild(headerDiv);
+                sectionDiv.appendChild(contentDiv);
+                container.appendChild(sectionDiv);
+                
+                selectedFrames[sectionIndex] = [];
+            });
+        }
+        
+        function toggleFrameSelection(sectionIndex, frameIndex, frameDiv) {
+            const isSelected = selectedFrames[sectionIndex].includes(frameIndex);
+            
+            if (isSelected) {
+                selectedFrames[sectionIndex] = selectedFrames[sectionIndex].filter(i => i !== frameIndex);
+                frameDiv.classList.remove('selected');
+            } else {
+                selectedFrames[sectionIndex].push(frameIndex);
+                frameDiv.classList.add('selected');
+            }
+            
+            updateSelectionSummary();
+        }
+        
+        function updateSelectionSummary() {
+            const totalSelected = Object.values(selectedFrames).reduce((sum, frames) => sum + frames.length, 0);
+            const sectionsWithSelections = Object.values(selectedFrames).filter(frames => frames.length > 0).length;
+            
+            if (totalSelected > 0) {
+                document.getElementById('selection-summary').style.display = 'block';
+                
+                const statsContainer = document.getElementById('summary-stats');
+                statsContainer.innerHTML = `
+                    <div class="stat-item">
+                        <div class="stat-value">${totalSelected}</div>
+                        <div class="stat-label">Total Frames</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${sectionsWithSelections}</div>
+                        <div class="stat-label">Sections Covered</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${(totalSelected / sectionsWithSelections || 0).toFixed(1)}</div>
+                        <div class="stat-label">Avg per Section</div>
+                    </div>
+                `;
+            } else {
+                document.getElementById('selection-summary').style.display = 'none';
+            }
+        }
+        
+        async function saveSelections() {
+            if (!sessionData) return;
+            
+            const selectionsData = {
+                video_id: sessionData.video_id,
+                video_path: sessionData.video_path,
+                sections: sessionData.sections_with_frames.map((section, sectionIndex) => ({
+                    title: section.title,
+                    start_time: section.start_time,
+                    end_time: section.end_time,
+                    available_frames: section.frames,
+                    selected_frames: selectedFrames[sectionIndex].map(frameIndex => 
+                        'temp_frames/' + section.frames[frameIndex].filename
+                    )
+                }))
+            };
+            
+            try {
+                const response = await fetch('/save_selections', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(selectionsData)
+                });
+                
+                if (response.ok) {
+                    showSuccess('Selections saved successfully!');
+                    document.getElementById('step3').style.display = 'block';
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to save selections');
+                }
+                
+            } catch (error) {
+                showError('Error saving selections: ' + error.message);
+            }
+        }
+        
+        async function analyzeSelections() {
+            if (!sessionData) return;
+            
+            const analyzeBtn = document.getElementById('analyze-btn');
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = '🔄 Analyzing...';
+            
+            try {
+                const response = await fetch('/analyze_selections', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ video_id: sessionData.video_id })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to analyze selections');
+                }
+                
+                const analysis = await response.json();
+                showAnalysisResults(analysis);
+                
+            } catch (error) {
+                showError('Error analyzing selections: ' + error.message);
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = '🧠 Analyze Selections';
+            }
+        }
+        
+        function showAnalysisResults(analysis) {
+            const resultsDiv = document.getElementById('analysis-results');
+            resultsDiv.style.display = 'block';
+            
+            const selectedCount = analysis.selected_frames_analysis.length;
+            const rejectedCount = analysis.rejected_frames_analysis.length;
+            const detailed = analysis.detailed_analysis || {};
+            
+            let html = `
+                <h3>📊 Detailed Frame Analysis</h3>
+                <p><strong>Dataset:</strong> ${selectedCount} selected frames, ${rejectedCount} rejected frames</p>
+            `;
+            
+            // Detailed metrics
+            if (detailed.detailed_metrics) {
+                html += `<h4>📈 Visual Quality Metrics</h4>`;
+                html += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 15px 0;">`;
+                
+                for (const [metric, data] of Object.entries(detailed.detailed_metrics)) {
+                    const metricName = metric.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    html += `
+                        <div style="background: white; padding: 15px; border-radius: 8px; border-left: 4px solid #667eea;">
+                            <h5 style="margin: 0 0 10px 0; color: #333;">${metricName}</h5>
+                            <div style="font-size: 0.9em;">
+                                <div>Selected: <strong>${data.selected_avg}</strong></div>
+                                <div>Rejected: <strong>${data.rejected_avg}</strong></div>
+                                <div>Difference: <strong style="color: ${data.difference > 0 ? '#4CAF50' : '#f44336'}">${data.difference > 0 ? '+' : ''}${data.difference}</strong></div>
+                                <div style="color: #666; margin-top: 5px;">${data.preference_strength}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+                html += `</div>`;
+            }
+            
+            // Feature preferences
+            if (detailed.feature_preferences) {
+                html += `<h4>🎯 Feature Preferences</h4>`;
+                html += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin: 15px 0;">`;
+                
+                for (const [feature, data] of Object.entries(detailed.feature_preferences)) {
+                    const featureName = feature.replace('has_', '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    const color = data.preference_score > 0 ? '#4CAF50' : data.preference_score < 0 ? '#f44336' : '#999';
+                    html += `
+                        <div style="background: white; padding: 15px; border-radius: 8px; border-left: 4px solid ${color};">
+                            <h5 style="margin: 0 0 10px 0; color: #333;">${featureName}</h5>
+                            <div style="font-size: 0.9em;">
+                                <div>Your preference: <strong style="color: ${color}">${data.preference_score > 0 ? '+' : ''}${data.preference_score}</strong></div>
+                                <div>Selected frequency: ${(data.selected_frequency * 100).toFixed(1)}%</div>
+                                <div>Rejected frequency: ${(data.rejected_frequency * 100).toFixed(1)}%</div>
+                                <div style="color: #666; margin-top: 5px;">${data.strength}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+                html += `</div>`;
+            }
+            
+            // Config recommendations
+            if (detailed.config_recommendations) {
+                html += `<h4>⚙️ Specific Config Recommendations</h4>`;
+                
+                if (detailed.config_recommendations.scoring_weights) {
+                    const weights = detailed.config_recommendations.scoring_weights;
+                    html += `
+                        <div style="background: #f0f8ff; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                            <h5>Scoring Weight Adjustments</h5>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+                                <div>
+                                    <strong>Base Score Weight</strong><br>
+                                    ${weights.current_base} → <span style="color: #4CAF50;">${weights.base_score_weight}</span>
+                                </div>
+                                <div>
+                                    <strong>Text Score Weight</strong><br>
+                                    ${weights.current_text} → <span style="color: #4CAF50;">${weights.text_score_weight}</span>
+                                </div>
+                                <div>
+                                    <strong>Visual Score Weight</strong><br>
+                                    ${weights.current_visual} → <span style="color: #4CAF50;">${weights.visual_score_weight}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                if (detailed.config_recommendations.score_threshold) {
+                    const threshold = detailed.config_recommendations.score_threshold;
+                    html += `
+                        <div style="background: #fff8e1; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                            <h5>Score Threshold Adjustment</h5>
+                            <p>Change threshold from <strong>${threshold.current}</strong> to <strong style="color: #4CAF50;">${threshold.recommended}</strong></p>
+                            <p style="font-size: 0.9em; color: #666;">Based on your selection ratio: ${(threshold.selection_ratio * 100).toFixed(1)}%</p>
+                        </div>
+                    `;
+                }
+            }
+            
+            // Actionable changes
+            if (detailed.actionable_changes && detailed.actionable_changes.length > 0) {
+                html += `<h4>🔧 Ready-to-Apply Changes</h4>`;
+                html += `<div style="margin: 15px 0;">`;
+                
+                detailed.actionable_changes.forEach((change, index) => {
+                    if (change.type === 'config_update') {
+                        html += `
+                            <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #4CAF50;">
+                                <h6 style="margin: 0 0 10px 0;">📝 Config Update: ${change.file}</h6>
+                                <pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto;"># ${change.section}:
+${Object.entries(change.changes).map(([key, value]) => `${key}: ${value}`).join('\\n')}</pre>
+                                <p style="margin: 10px 0 0 0; font-size: 0.9em; color: #666;">${change.reason}</p>
+                            </div>
+                        `;
+                    } else if (change.type === 'algorithm_improvement') {
+                        html += `
+                            <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #ff9800;">
+                                <h6 style="margin: 0 0 10px 0;">🧠 Algorithm Enhancement: ${change.component}</h6>
+                                <p><strong>Modification:</strong> ${change.modification}</p>
+                                <pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto;">${change.code_change}</pre>
+                            </div>
+                        `;
+                    }
+                });
+                
+                html += `</div>`;
+            }
+            
+            resultsDiv.innerHTML = html;
+        }
+        
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            document.body.insertBefore(errorDiv, document.body.firstChild);
+            
+            setTimeout(() => errorDiv.remove(), 5000);
+        }
+        
+        function showSuccess(message) {
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success';
+            successDiv.textContent = message;
+            document.body.insertBefore(successDiv, document.body.firstChild);
+            
+            setTimeout(() => successDiv.remove(), 3000);
+        }
+    </script>
+</body>
+</html>

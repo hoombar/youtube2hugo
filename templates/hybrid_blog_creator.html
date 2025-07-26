@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hybrid Blog Creator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 2.8em;
+            font-weight: 300;
+        }
+        
+        .header p {
+            margin: 15px 0 0 0;
+            opacity: 0.9;
+            font-size: 1.2em;
+        }
+        
+        .workflow-steps {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        .workflow-step {
+            background: rgba(255,255,255,0.2);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+        
+        .step {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .step h2 {
+            margin-top: 0;
+            color: #333;
+            font-size: 1.6em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .input-group input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .input-group input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 14px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+        }
+        
+        .btn-generate {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+            font-size: 18px;
+            padding: 16px 40px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .section-card {
+            background: #f9f9f9;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            overflow: hidden;
+        }
+        
+        .section-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .section-title {
+            font-size: 1.4em;
+            font-weight: 600;
+            margin: 0;
+        }
+        
+        .section-info {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        .section-content {
+            padding: 20px;
+        }
+        
+        .section-preview {
+            background: #f0f8ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .section-preview h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        
+        .section-preview p {
+            margin: 0;
+            color: #666;
+            line-height: 1.5;
+        }
+        
+        .frames-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .frame-item {
+            border: 3px solid #ddd;
+            border-radius: 8px;
+            padding: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: white;
+        }
+        
+        .frame-item:hover {
+            border-color: #667eea;
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .frame-item.selected {
+            border-color: #4CAF50;
+            background: #f0fff0;
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+        }
+        
+        .frame-item img {
+            width: 100%;
+            height: auto;
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+        
+        .frame-info {
+            font-size: 0.8em;
+            color: #666;
+        }
+        
+        .selection-summary {
+            background: #e8f5e8;
+            border: 2px solid #4CAF50;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .selection-summary h3 {
+            margin: 0 0 15px 0;
+            color: #2e7d32;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+        }
+        
+        .summary-item {
+            text-align: center;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .summary-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #2e7d32;
+        }
+        
+        .summary-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        
+        .final-step {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            margin-top: 30px;
+        }
+        
+        .final-step h3 {
+            margin: 0 0 15px 0;
+            font-size: 1.8em;
+        }
+        
+        .final-step p {
+            margin: 0 0 20px 0;
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        
+        .result-panel {
+            background: #e8f5e8;
+            border: 2px solid #4CAF50;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 20px 0;
+        }
+        
+        .result-panel h3 {
+            margin: 0 0 15px 0;
+            color: #2e7d32;
+        }
+        
+        .result-panel a {
+            color: #2e7d32;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        
+        .result-panel a:hover {
+            text-decoration: underline;
+        }
+        
+        .error {
+            background: #ffebee;
+            border: 2px solid #f44336;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        
+        .success {
+            background: #e8f5e8;
+            border: 2px solid #4CAF50;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎬 Hybrid Blog Creator</h1>
+        <p>AI-powered content processing with manual frame selection</p>
+        <div class="workflow-steps">
+            <div class="workflow-step">📝 AI Content Processing</div>
+            <div class="workflow-step">🖼️ Smart Frame Extraction</div>
+            <div class="workflow-step">👆 Manual Frame Selection</div>
+            <div class="workflow-step">📰 Blog Generation</div>
+        </div>
+    </div>
+
+    <!-- Step 1: Video Input -->
+    <div class="step" id="step1">
+        <h2>📹 Step 1: Video & Title</h2>
+        <div class="input-group">
+            <label for="video-path">Video File Path:</label>
+            <input type="text" id="video-path" placeholder="/path/to/your/video.mp4">
+        </div>
+        <div class="input-group">
+            <label for="blog-title">Blog Post Title:</label>
+            <input type="text" id="blog-title" placeholder="Enter your blog post title">
+        </div>
+        <div class="input-group">
+            <label for="frame-processing-mode">Frame Processing Mode:</label>
+            <select id="frame-processing-mode" style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 16px;">
+                <option value="smart">Smart frame selection (slowest - analyzes quality, filters bad frames)</option>
+                <option value="dedupe">Remove duplicates (medium - extracts every 0.5s, removes similar frames)</option>
+                <option value="raw">No processing (fastest - every 0.5 seconds, all frames)</option>
+            </select>
+            <small style="color: #666; display: block; margin-top: 5px;">
+                Choose your balance between speed and frame quality filtering
+            </small>
+        </div>
+        <button class="btn" onclick="processVideo()" id="process-btn">🚀 Process Video & Create Sections</button>
+        
+        <div id="processing-status" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p><strong>AI Processing in Progress...</strong></p>
+            <p><small>Extracting transcript → Cleaning technical terms → Creating sections → Extracting frames</small></p>
+        </div>
+    </div>
+
+    <!-- Step 2: Section Review & Frame Selection -->
+    <div class="step" id="step2" style="display: none;">
+        <h2>🎯 Step 2: Review Sections & Select Frames</h2>
+        <p>Review the AI-generated sections and select the best frames for each one:</p>
+        
+        <div id="sections-container"></div>
+        
+        <div class="selection-summary" id="selection-summary" style="display: none;">
+            <h3>📊 Frame Selection Summary</h3>
+            <div class="summary-grid" id="summary-grid"></div>
+        </div>
+    </div>
+
+    <!-- Step 3: Blog Generation -->
+    <div class="final-step" id="step3" style="display: none;">
+        <h3>🏗️ Step 3: Generate Blog Post</h3>
+        <p>Ready to create your blog post with the selected frames!</p>
+        <button class="btn btn-generate" onclick="generateBlog()" id="generate-btn">📰 Generate Final Blog Post</button>
+        
+        <div id="generation-status" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Generating your blog post with selected frames...</p>
+        </div>
+        
+        <div id="final-result" class="result-panel" style="display: none;"></div>
+    </div>
+
+    <script>
+        let sessionData = null;
+        let selectedFrames = {};
+        
+        async function processVideo() {
+            const videoPath = document.getElementById('video-path').value.trim();
+            const title = document.getElementById('blog-title').value.trim();
+            const processingMode = document.getElementById('frame-processing-mode').value;
+            
+            if (!videoPath) {
+                alert('Please enter a video file path');
+                return;
+            }
+            
+            const processBtn = document.getElementById('process-btn');
+            const processingStatus = document.getElementById('processing-status');
+            
+            // Update processing message based on mode
+            const processingMessages = {
+                'smart': 'AI Processing + Smart Frame Analysis...',
+                'dedupe': 'AI Processing + Duplicate Removal...',
+                'raw': 'AI Processing + Fast Frame Extraction...'
+            };
+            processingStatus.querySelector('p strong').textContent = processingMessages[processingMode];
+            
+            processBtn.disabled = true;
+            processingStatus.style.display = 'block';
+            
+            try {
+                const response = await fetch('/process_video', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        video_path: videoPath,
+                        title: title,
+                        processing_mode: processingMode
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to process video');
+                }
+                
+                sessionData = await response.json();
+                showSectionSelection();
+                
+            } catch (error) {
+                showError('Error processing video: ' + error.message);
+            } finally {
+                processBtn.disabled = false;
+                processingStatus.style.display = 'none';
+            }
+        }
+        
+        function showSectionSelection() {
+            document.getElementById('step2').style.display = 'block';
+            
+            const container = document.getElementById('sections-container');
+            container.innerHTML = '';
+            
+            // Check if AI processing might have failed
+            if (sessionData.ai_processing_success === false) {
+                const warningDiv = document.createElement('div');
+                warningDiv.className = 'error';
+                warningDiv.innerHTML = `
+                    <strong>⚠️ AI Processing Warning</strong><br>
+                    AI content formatting may have failed. You might see transcript-like content instead of properly formatted blog text.
+                    This can happen due to Gemini API issues and is unrelated to your selected frame processing mode.
+                    The generated blog will still work, but may need manual editing.
+                `;
+                container.appendChild(warningDiv);
+            }
+            
+            sessionData.sections.forEach((section, sectionIndex) => {
+                const frameData = sessionData.frames_data[sectionIndex];
+                
+                const sectionDiv = document.createElement('div');
+                sectionDiv.className = 'section-card';
+                
+                // Create section header with transcript toggle
+                const sectionHeaderHtml = `
+                    <div class="section-header">
+                        <div>
+                            <div class="section-title">${section.title}</div>
+                        </div>
+                        <div class="section-info">
+                            ${frameData.frame_count} frames | ${section.start_time.toFixed(1)}s - ${section.end_time.toFixed(1)}s
+                            <br>
+                            <label style="font-size: 0.8em; margin-top: 5px;">
+                                <input type="checkbox" id="show-transcript-${sectionIndex}" onchange="toggleTranscript(${sectionIndex})">
+                                Show original transcript
+                            </label>
+                        </div>
+                    </div>
+                    <div id="raw-transcript-${sectionIndex}" style="display: none; background: #f0f8ff; padding: 15px; margin: 0 20px 15px 20px; border-radius: 8px; border-left: 4px solid #4CAF50;">
+                        <h6 style="margin: 0 0 10px 0; color: #2e7d32;">🎙️ Original Transcript (${section.start_time.toFixed(1)}s - ${section.end_time.toFixed(1)}s)</h6>
+                        <p style="white-space: pre-wrap; line-height: 1.6; font-style: italic; color: #555;" id="transcript-text-${sectionIndex}">Loading transcript...</p>
+                    </div>
+                `;
+                
+                // Create paragraphs for frame selection
+                let paragraphsHtml = '';
+                const paragraphs = section.paragraphs || [section]; // Fallback if no paragraphs
+                
+                paragraphs.forEach((paragraph, paragraphIndex) => {
+                    // Get frames for this paragraph's time range
+                    const paragraphFrames = frameData.frames.filter(frame =>
+                        frame.timestamp >= paragraph.start_time && frame.timestamp <= paragraph.end_time
+                    );
+                    
+                    paragraphsHtml += `
+                        <div class="paragraph-section" style="margin-bottom: 30px; padding: 15px; background: #fafafa; border-radius: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <h5 style="margin: 0; color: #333;">📝 Paragraph ${paragraphIndex + 1}</h5>
+                                <span style="font-size: 0.8em; color: #666;">${paragraph.start_time.toFixed(1)}s - ${paragraph.end_time.toFixed(1)}s | ${paragraphFrames.length} frames</span>
+                            </div>
+                            
+                            <div class="paragraph-content" style="margin-bottom: 15px;">
+                                <p style="white-space: pre-wrap; line-height: 1.6; margin: 0; font-size: 0.95em;">${paragraph.content}</p>
+                            </div>
+                            
+                            <h6 style="margin: 10px 0 5px 0; color: #555;">🖼️ Select frames for this paragraph:</h6>
+                            <div class="frames-grid">
+                                ${paragraphFrames.map((frame, frameIndex) => {
+                                    const globalFrameIndex = frameData.frames.findIndex(f => f.filename === frame.filename);
+                                    return `
+                                        <div class="frame-item" onclick="toggleFrameSelection(${sectionIndex}, ${globalFrameIndex}, this, ${paragraphIndex})">
+                                            <img src="/images/${frame.filename}" alt="Frame at ${frame.timestamp.toFixed(1)}s">
+                                            <div class="frame-info">${frame.timestamp.toFixed(1)}s</div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                            
+                            ${paragraphFrames.length === 0 ? 
+                                '<p style="color: #999; font-style: italic; margin: 10px 0;">No frames available for this time range</p>' : 
+                                ''
+                            }
+                        </div>
+                    `;
+                });
+                
+                sectionDiv.innerHTML = sectionHeaderHtml + `
+                    <div class="section-content">
+                        <div id="formatted-content-${sectionIndex}">
+                            ${paragraphsHtml}
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(sectionDiv);
+                selectedFrames[sectionIndex] = [];
+            });
+        }
+        
+        function toggleFrameSelection(sectionIndex, frameIndex, frameDiv, paragraphIndex) {
+            const isSelected = selectedFrames[sectionIndex].includes(frameIndex);
+            
+            if (isSelected) {
+                selectedFrames[sectionIndex] = selectedFrames[sectionIndex].filter(i => i !== frameIndex);
+                frameDiv.classList.remove('selected');
+            } else {
+                selectedFrames[sectionIndex].push(frameIndex);
+                frameDiv.classList.add('selected');
+            }
+            
+            updateSelectionSummary();
+        }
+        
+        function toggleTranscript(sectionIndex) {
+            const checkbox = document.getElementById(`show-transcript-${sectionIndex}`);
+            const rawTranscript = document.getElementById(`raw-transcript-${sectionIndex}`);
+            const formattedContent = document.getElementById(`formatted-content-${sectionIndex}`);
+            
+            if (checkbox.checked) {
+                // Show raw transcript, hide formatted
+                rawTranscript.style.display = 'block';
+                formattedContent.style.display = 'none';
+                
+                // Load transcript content if not already loaded
+                const section = sessionData.sections[sectionIndex];
+                const transcriptText = document.getElementById(`transcript-text-${sectionIndex}`);
+                
+                if (transcriptText.textContent === 'Loading transcript...') {
+                    // Find transcript segments for this section's time range
+                    const sectionTranscripts = sessionData.transcript_segments.filter(segment => 
+                        segment.start_time >= section.start_time && segment.end_time <= section.end_time
+                    );
+                    
+                    if (sectionTranscripts.length > 0) {
+                        const transcriptContent = sectionTranscripts.map(segment => 
+                            `[${segment.start_time.toFixed(1)}s] ${segment.text}`
+                        ).join('\n\n');
+                        transcriptText.textContent = transcriptContent;
+                    } else {
+                        transcriptText.textContent = 'No transcript segments found for this time range.';
+                    }
+                }
+            } else {
+                // Show formatted content, hide raw transcript
+                rawTranscript.style.display = 'none';
+                formattedContent.style.display = 'block';
+            }
+        }
+        
+        function updateSelectionSummary() {
+            const totalSelected = Object.values(selectedFrames).reduce((sum, frames) => sum + frames.length, 0);
+            const sectionsWithSelections = Object.values(selectedFrames).filter(frames => frames.length > 0).length;
+            
+            if (totalSelected > 0) {
+                document.getElementById('selection-summary').style.display = 'block';
+                document.getElementById('step3').style.display = 'block';
+                
+                const summaryGrid = document.getElementById('summary-grid');
+                summaryGrid.innerHTML = `
+                    <div class="summary-item">
+                        <div class="summary-value">${totalSelected}</div>
+                        <div class="summary-label">Total Frames</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value">${sectionsWithSelections}</div>
+                        <div class="summary-label">Sections Covered</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value">${(totalSelected / sectionsWithSelections || 0).toFixed(1)}</div>
+                        <div class="summary-label">Avg per Section</div>
+                    </div>
+                `;
+            } else {
+                document.getElementById('selection-summary').style.display = 'none';
+                document.getElementById('step3').style.display = 'none';
+            }
+        }
+        
+        async function generateBlog() {
+            if (!sessionData) return;
+            
+            const generateBtn = document.getElementById('generate-btn');
+            const generationStatus = document.getElementById('generation-status');
+            
+            generateBtn.disabled = true;
+            generationStatus.style.display = 'block';
+            
+            // Prepare selections data
+            const selectionsData = {
+                session_id: sessionData.session_id,
+                sections: sessionData.sections.map((section, sectionIndex) => ({
+                    section_title: section.title,
+                    section_index: sectionIndex,
+                    selected_frames: selectedFrames[sectionIndex].map(frameIndex => 
+                        sessionData.frames_data[sectionIndex].frames[frameIndex].filename
+                    )
+                }))
+            };
+            
+            try {
+                // Save selections first
+                const saveResponse = await fetch('/save_frame_selections', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(selectionsData)
+                });
+                
+                if (!saveResponse.ok) {
+                    throw new Error('Failed to save selections');
+                }
+                
+                // Generate blog
+                const blogResponse = await fetch('/generate_blog', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (!blogResponse.ok) {
+                    const error = await blogResponse.json();
+                    throw new Error(error.error || 'Failed to generate blog');
+                }
+                
+                const result = await blogResponse.json();
+                showFinalResult(result);
+                
+            } catch (error) {
+                showError('Error generating blog: ' + error.message);
+            } finally {
+                generateBtn.disabled = false;
+                generationStatus.style.display = 'none';
+            }
+        }
+        
+        function showFinalResult(result) {
+            const resultDiv = document.getElementById('final-result');
+            resultDiv.style.display = 'block';
+            
+            resultDiv.innerHTML = `
+                <h3>🎉 Blog Post Generated Successfully!</h3>
+                <p><strong>Output File:</strong> <a href="${result.output_file}" target="_blank">${result.output_file}</a></p>
+                <p><strong>Frames Used:</strong> ${result.frames_used}</p>
+                <p><strong>Status:</strong> Your blog post is ready for publication!</p>
+            `;
+        }
+        
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            document.body.insertBefore(errorDiv, document.body.firstChild);
+            
+            setTimeout(() => errorDiv.remove(), 8000);
+        }
+        
+        function showSuccess(message) {
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success';
+            successDiv.textContent = message;
+            document.body.insertBefore(successDiv, document.body.firstChild);
+            
+            setTimeout(() => successDiv.remove(), 5000);
+        }
+    </script>
+</body>
+</html>
