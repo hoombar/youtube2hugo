@@ -1034,40 +1034,61 @@ class HybridBlogCreator:
         
         logger.info("🏗️ Generating final blog post with selected frames...")
         
-        # Prepare frame data for Hugo generator
+        # Prepare frame data for Hugo generator with paragraph grouping
         selected_frames = []
         for section_data in selections['sections']:
-            for frame_path in section_data['selected_frames']:
-                # Copy selected frame to a final location
-                frame_filename = os.path.basename(frame_path)
-                src_path = os.path.join(session_dir, 'frames', frame_filename)
-                
-                if os.path.exists(src_path):
-                    # Extract timestamp from filename (assumes format like "frame_123.5s.jpg")
-                    timestamp = 0.0
-                    try:
-                        # Try to extract timestamp from filename
-                        import re
-                        match = re.search(r'(\d+\.?\d*)s?\.jpg', frame_filename)
-                        if match:
-                            timestamp = float(match.group(1))
-                        else:
-                            # Fallback: try to get from frame index (frame_00123.jpg -> 123 * 0.5)
-                            match = re.search(r'frame_(\d+)\.jpg', frame_filename)
-                            if match:
-                                frame_index = int(match.group(1))
-                                timestamp = frame_index * 0.5
-                    except:
-                        timestamp = 0.0
+            frames_with_paragraphs = section_data.get('frames_with_paragraphs', [])
+            
+            if frames_with_paragraphs:
+                # Use the new paragraph-aware data structure
+                for frame_info in frames_with_paragraphs:
+                    frame_filename = frame_info['filename']
+                    src_path = os.path.join(session_dir, 'frames', frame_filename)
                     
-                    selected_frames.append({
-                        'filename': frame_filename,
-                        'path': src_path,
-                        'section': section_data['section_title'],
-                        'section_title': section_data['section_title'],
-                        'timestamp': timestamp,
-                        'should_include': True  # Mark as selected for processing
-                    })
+                    if os.path.exists(src_path):
+                        selected_frames.append({
+                            'filename': frame_filename,
+                            'path': src_path,
+                            'section': section_data['section_title'],
+                            'section_title': section_data['section_title'],
+                            'timestamp': frame_info['timestamp'],
+                            'paragraph_index': frame_info['paragraph_index'],
+                            'paragraph_start_time': frame_info['paragraph_start_time'],
+                            'paragraph_end_time': frame_info['paragraph_end_time'],
+                            'should_include': True  # Mark as selected for processing
+                        })
+            else:
+                # Fallback to old method for backward compatibility
+                for frame_path in section_data['selected_frames']:
+                    frame_filename = os.path.basename(frame_path)
+                    src_path = os.path.join(session_dir, 'frames', frame_filename)
+                    
+                    if os.path.exists(src_path):
+                        # Extract timestamp from filename (assumes format like "frame_123.5s.jpg")
+                        timestamp = 0.0
+                        try:
+                            # Try to extract timestamp from filename
+                            import re
+                            match = re.search(r'(\d+\.?\d*)s?\.jpg', frame_filename)
+                            if match:
+                                timestamp = float(match.group(1))
+                            else:
+                                # Fallback: try to get from frame index (frame_00123.jpg -> 123 * 0.5)
+                                match = re.search(r'frame_(\d+)\.jpg', frame_filename)
+                                if match:
+                                    frame_index = int(match.group(1))
+                                    timestamp = frame_index * 0.5
+                        except:
+                            timestamp = 0.0
+                        
+                        selected_frames.append({
+                            'filename': frame_filename,
+                            'path': src_path,
+                            'section': section_data['section_title'],
+                            'section_title': section_data['section_title'],
+                            'timestamp': timestamp,
+                            'should_include': True  # Mark as selected for processing
+                        })
         
         # Generate blog using Hugo generator
         hugo_generator = HugoGenerator(self.config)

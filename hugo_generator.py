@@ -1214,15 +1214,19 @@ document.addEventListener('keydown', function(event) {
                 frames_to_insert = self._pending_frames[:]
                 self._pending_frames = []
                 
-                # Generate frame markdown
-                frame_markdowns = []
-                for frame in frames_to_insert:
-                    frame_markdown = self._generate_semantic_frame_markdown_for_formatted_content(frame)
-                    frame_markdowns.append(frame_markdown)
+                # Group frames by timestamp proximity to determine if they should be displayed together
+                grouped_frames = self._group_frames_by_proximity(frames_to_insert)
                 
-                # Insert frames before the content line so text flows around them
-                for frame_markdown in frame_markdowns:
-                    result_lines.append(frame_markdown)
+                # Generate frame markdown for each group
+                for frame_group in grouped_frames:
+                    if len(frame_group) == 1:
+                        # Single frame
+                        frame_markdown = self._generate_semantic_frame_markdown_for_formatted_content(frame_group[0])
+                        result_lines.append(frame_markdown)
+                    else:
+                        # Multiple frames - use grid layout
+                        grid_markdown = self._generate_semantic_frame_grid_markdown_for_formatted_content(frame_group)
+                        result_lines.append(grid_markdown)
                     
                 logger.info(f"  🖼️  Inserted {len(frames_to_insert)} frames inline with content for text wrapping")
             
@@ -1275,6 +1279,78 @@ document.addEventListener('keydown', function(event) {
         
         return '\n'.join(result_lines)
     
+    def _group_frames_by_proximity(self, frames: List[Dict]) -> List[List[Dict]]:
+        """Group frames by paragraph information or timestamp proximity."""
+        if not frames:
+            return []
+        
+        # Sort frames by timestamp first
+        sorted_frames = sorted(frames, key=lambda x: x.get('timestamp', 0))
+        
+        # Check if we have paragraph information
+        has_paragraph_info = any(f.get('paragraph_index') is not None for f in sorted_frames)
+        
+        if has_paragraph_info:
+            # Group by paragraph index and paragraph time ranges
+            paragraph_groups = {}
+            
+            for frame in sorted_frames:
+                paragraph_key = f"{frame.get('paragraph_index', 0)}_{frame.get('paragraph_start_time', 0)}_{frame.get('paragraph_end_time', 0)}"
+                
+                if paragraph_key not in paragraph_groups:
+                    paragraph_groups[paragraph_key] = []
+                
+                paragraph_groups[paragraph_key].append(frame)
+            
+            # Convert to list of groups, respecting the 3-image limit per paragraph
+            groups = []
+            for paragraph_key, paragraph_frames in paragraph_groups.items():
+                # Sort frames within the paragraph by timestamp
+                paragraph_frames.sort(key=lambda x: x.get('timestamp', 0))
+                
+                # Split into groups of max 3 frames each
+                for i in range(0, len(paragraph_frames), 3):
+                    group = paragraph_frames[i:i+3]
+                    groups.append(group)
+            
+            logger.info(f"🖼️ Grouped {len(frames)} frames by paragraph info into {len(groups)} display groups")
+            for i, group in enumerate(groups):
+                timestamps = [f"{f.get('timestamp', 0):.1f}s" for f in group]
+                paragraph_indices = [str(f.get('paragraph_index', 'unknown')) for f in group]
+                logger.info(f"  Group {i+1}: {len(group)} frames at {', '.join(timestamps)} (paragraphs: {', '.join(set(paragraph_indices))})")
+            
+        else:
+            # Fallback to proximity-based grouping
+            groups = []
+            current_group = [sorted_frames[0]]
+            
+            # Group frames that are within 10 seconds of each other (same paragraph)
+            proximity_threshold = 10.0  # seconds
+            
+            for i in range(1, len(sorted_frames)):
+                current_frame = sorted_frames[i]
+                last_frame_in_group = current_group[-1]
+                
+                time_diff = abs(current_frame.get('timestamp', 0) - last_frame_in_group.get('timestamp', 0))
+                
+                if time_diff <= proximity_threshold and len(current_group) < 3:  # Max 3 images per group
+                    current_group.append(current_frame)
+                else:
+                    # Start a new group
+                    groups.append(current_group)
+                    current_group = [current_frame]
+            
+            # Add the last group
+            if current_group:
+                groups.append(current_group)
+            
+            logger.info(f"🖼️ Grouped {len(frames)} frames by proximity into {len(groups)} display groups")
+            for i, group in enumerate(groups):
+                timestamps = [f"{f.get('timestamp', 0):.1f}s" for f in group]
+                logger.info(f"  Group {i+1}: {len(group)} frames at {', '.join(timestamps)}")
+        
+        return groups
+    
     def _generate_semantic_frame_markdown_for_formatted_content(self, frame: Dict) -> str:
         """Generate markdown for a single semantic frame in formatted content with consistent right-float layout."""
         
@@ -1291,6 +1367,51 @@ document.addEventListener('keydown', function(event) {
             # Use HTML with inline styles - always float right at 50% width with click-to-enlarge
             # Add some top margin to prevent images from sitting too close to headers
             return f'<img src="{image_path}" alt="{alt_text}" style="width: 50%; float: right; margin-left: 20px; margin-bottom: 15px; margin-top: 10px; border-radius: 4px; cursor: pointer;" title="{section_title} at {timestamp:.1f}s" onclick="openImageModal(\'{image_path}\', \'{alt_text}\')">'
+    
+    def _generate_semantic_frame_grid_markdown_for_formatted_content(self, frames: List[Dict]) -> str:
+        """Generate markdown for multiple frames in formatted content using horizontal layout."""
+        
+        if not frames:
+            return ""
+        
+        if len(frames) == 1:
+            return self._generate_semantic_frame_markdown_for_formatted_content(frames[0])
+        
+        # Calculate width for each image based on count
+        num_images = len(frames)
+        if num_images == 2:
+            img_width = "25%"
+        elif num_images == 3:
+            img_width = "16.666%"
+        else:
+            img_width = f"{50/num_images:.1f}%"  # Fallback for 4+ images
+        
+        # Generate individual image elements
+        image_elements = []
+        for frame in frames:
+            image_path = self._get_hugo_image_path(frame)
+            timestamp = frame['timestamp']
+            section_title = frame.get('section_title', 'Content')
+            alt_text = f"{section_title} demonstration at {timestamp:.1f}s"
+            
+            if self.config.get('use_hugo_shortcodes', False):
+                image_elements.append(f'{{{{< figure src="{image_path}" alt="{alt_text}" caption="{timestamp:.1f}s" class="grid-image" width="{img_width}" >}}}}')
+            else:
+                # HTML img tag with horizontal layout styling
+                img_style = f"width: {img_width} !important; height: auto !important; object-fit: cover; border-radius: 4px; display: inline-block !important; margin: 0 5px 10px 0 !important; cursor: pointer !important;"
+                image_elements.append(f'<img src="{image_path}" alt="{alt_text}" style="{img_style}" title="{section_title} at {timestamp:.1f}s" onclick="openImageModal(\'{image_path}\', \'{alt_text}\')">')
+        
+        # Wrap in container for horizontal layout
+        if self.config.get('use_hugo_shortcodes', False):
+            return f'''{{{{< image-grid columns="{num_images}" >}}}}
+{chr(10).join(image_elements)}
+{{{{< /image-grid >}}}}'''
+        else:
+            # Use flexbox container for horizontal layout
+            container_style = f"display: flex; justify-content: center; gap: 10px; margin: 20px 0; flex-wrap: wrap;"
+            return f'''<div style="{container_style}">
+{chr(10).join(image_elements)}
+</div>'''
     
     def _generate_frame_grid_markdown_for_formatted_content(self, frames: List[Dict]) -> str:
         """Generate markdown for multiple frames in formatted content using consistent right-float layout."""

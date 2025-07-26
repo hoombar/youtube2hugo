@@ -859,16 +859,46 @@
             generateBtn.disabled = true;
             generationStatus.style.display = 'block';
             
-            // Prepare selections data
+            // Prepare selections data with paragraph information
             const selectionsData = {
                 session_id: sessionData.session_id,
-                sections: sessionData.sections.map((section, sectionIndex) => ({
-                    section_title: section.title,
-                    section_index: sectionIndex,
-                    selected_frames: selectedFrames[sectionIndex].map(frameIndex => 
-                        sessionData.frames_data[sectionIndex].frames[frameIndex].filename
-                    )
-                }))
+                sections: sessionData.sections.map((section, sectionIndex) => {
+                    const paragraphs = section.paragraphs || [section];
+                    const frameData = sessionData.frames_data[sectionIndex];
+                    const selectedFrameIndices = selectedFrames[sectionIndex] || [];
+                    
+                    // Group selected frames by paragraph
+                    const framesWithParagraphs = selectedFrameIndices.map(frameIndex => {
+                        const frame = frameData.frames[frameIndex];
+                        const timestamp = frame.timestamp;
+                        
+                        // Find which paragraph this frame belongs to
+                        let paragraphIndex = 0;
+                        for (let i = 0; i < paragraphs.length; i++) {
+                            if (timestamp >= paragraphs[i].start_time && timestamp <= paragraphs[i].end_time) {
+                                paragraphIndex = i;
+                                break;
+                            }
+                        }
+                        
+                        return {
+                            filename: frame.filename,
+                            timestamp: timestamp,
+                            paragraph_index: paragraphIndex,
+                            paragraph_start_time: paragraphs[paragraphIndex].start_time,
+                            paragraph_end_time: paragraphs[paragraphIndex].end_time
+                        };
+                    });
+                    
+                    return {
+                        section_title: section.title,
+                        section_index: sectionIndex,
+                        selected_frames: selectedFrameIndices.map(frameIndex => 
+                            frameData.frames[frameIndex].filename
+                        ),
+                        frames_with_paragraphs: framesWithParagraphs
+                    };
+                })
             };
             
             try {
