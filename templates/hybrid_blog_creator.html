@@ -230,6 +230,30 @@
             box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
         }
         
+        .frame-item.disabled {
+            opacity: 0.5;
+            cursor: not-allowed !important;
+        }
+        
+        .paragraph-section.max-reached {
+            border: 2px solid #ff9800;
+            background: #fff3e0;
+        }
+        
+        .paragraph-counter {
+            font-weight: bold;
+            padding: 3px 8px;
+            border-radius: 12px;
+            background: #e8f5e8;
+            color: #2e7d32;
+            font-size: 0.75em;
+        }
+        
+        .paragraph-counter.max-reached {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
         .frame-item img {
             width: 100%;
             height: auto;
@@ -531,14 +555,18 @@
                         <div class="paragraph-section" style="margin-bottom: 30px; padding: 15px; background: #fafafa; border-radius: 8px;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                                 <h5 style="margin: 0; color: #333;">📝 Paragraph ${paragraphIndex + 1}</h5>
-                                <span style="font-size: 0.8em; color: #666;">${paragraph.start_time.toFixed(1)}s - ${paragraph.end_time.toFixed(1)}s | ${paragraphFrames.length} frames</span>
+                                <div style="font-size: 0.8em; color: #666;">
+                                    <span>${paragraph.start_time.toFixed(1)}s - ${paragraph.end_time.toFixed(1)}s | ${paragraphFrames.length} frames</span>
+                                    <br>
+                                    <span id="paragraph-counter-${sectionIndex}-${paragraphIndex}" class="paragraph-counter">0/3 selected</span>
+                                </div>
                             </div>
                             
                             <div class="paragraph-content" style="margin-bottom: 15px;">
                                 <p style="white-space: pre-wrap; line-height: 1.6; margin: 0; font-size: 0.95em;">${paragraph.content}</p>
                             </div>
                             
-                            <h6 style="margin: 10px 0 5px 0; color: #555;">🖼️ Select frames for this paragraph:</h6>
+                            <h6 style="margin: 10px 0 5px 0; color: #555;">🖼️ Select frames for this paragraph (max 3):</h6>
                             <div class="frames-grid">
                                 ${paragraphFrames.map((frame, frameIndex) => {
                                     const globalFrameIndex = frameData.frames.findIndex(f => f.filename === frame.filename);
@@ -570,6 +598,9 @@
                 container.appendChild(sectionDiv);
                 selectedFrames[sectionIndex] = [];
             });
+            
+            // Initialize paragraph counters
+            updateParagraphCounters();
         }
         
         function toggleFrameSelection(sectionIndex, frameIndex, frameDiv, paragraphIndex) {
@@ -579,11 +610,107 @@
                 selectedFrames[sectionIndex] = selectedFrames[sectionIndex].filter(i => i !== frameIndex);
                 frameDiv.classList.remove('selected');
             } else {
+                // Check for 3-image limit per paragraph
+                const currentParagraphFrames = getCurrentParagraphSelectedFrames(sectionIndex, paragraphIndex);
+                if (currentParagraphFrames.length >= 3) {
+                    alert('Maximum 3 images allowed per paragraph. Please deselect an image first.');
+                    return;
+                }
+                
                 selectedFrames[sectionIndex].push(frameIndex);
                 frameDiv.classList.add('selected');
             }
             
             updateSelectionSummary();
+            updateParagraphCounters();
+        }
+        
+        function getCurrentParagraphSelectedFrames(sectionIndex, paragraphIndex) {
+            if (!sessionData || !sessionData.sections[sectionIndex] || !sessionData.sections[sectionIndex].paragraphs) {
+                return [];
+            }
+            
+            const paragraph = sessionData.sections[sectionIndex].paragraphs[paragraphIndex];
+            const frameData = sessionData.frames_data[sectionIndex];
+            
+            // Get frames for this paragraph's time range
+            const paragraphFrameIndices = [];
+            frameData.frames.forEach((frame, frameIndex) => {
+                if (frame.timestamp >= paragraph.start_time && frame.timestamp <= paragraph.end_time) {
+                    paragraphFrameIndices.push(frameIndex);
+                }
+            });
+            
+            // Filter to only selected frames in this paragraph
+            return selectedFrames[sectionIndex].filter(frameIndex => 
+                paragraphFrameIndices.includes(frameIndex)
+            );
+        }
+        
+        function updateParagraphCounters() {
+            if (!sessionData) return;
+            
+            sessionData.sections.forEach((section, sectionIndex) => {
+                const paragraphs = section.paragraphs || [section];
+                paragraphs.forEach((paragraph, paragraphIndex) => {
+                    const selectedCount = getCurrentParagraphSelectedFrames(sectionIndex, paragraphIndex).length;
+                    const counterElement = document.getElementById(`paragraph-counter-${sectionIndex}-${paragraphIndex}`);
+                    const paragraphSection = counterElement?.closest('.paragraph-section');
+                    
+                    if (counterElement) {
+                        counterElement.textContent = `${selectedCount}/3 selected`;
+                        
+                        // Update counter styling
+                        if (selectedCount >= 3) {
+                            counterElement.classList.add('max-reached');
+                            counterElement.classList.remove('paragraph-counter');
+                            counterElement.className = 'paragraph-counter max-reached';
+                        } else {
+                            counterElement.classList.remove('max-reached');
+                            counterElement.className = 'paragraph-counter';
+                        }
+                        
+                        // Update paragraph section styling
+                        if (paragraphSection) {
+                            if (selectedCount >= 3) {
+                                paragraphSection.classList.add('max-reached');
+                            } else {
+                                paragraphSection.classList.remove('max-reached');
+                            }
+                        }
+                        
+                        // Disable/enable unselected frames in this paragraph
+                        updateFrameDisabledState(sectionIndex, paragraphIndex, selectedCount >= 3);
+                    }
+                });
+            });
+        }
+        
+        function updateFrameDisabledState(sectionIndex, paragraphIndex, isMaxReached) {
+            if (!sessionData || !sessionData.sections[sectionIndex] || !sessionData.sections[sectionIndex].paragraphs) {
+                return;
+            }
+            
+            const paragraph = sessionData.sections[sectionIndex].paragraphs[paragraphIndex];
+            const frameData = sessionData.frames_data[sectionIndex];
+            
+            // Find all frame elements in this paragraph
+            frameData.frames.forEach((frame, frameIndex) => {
+                if (frame.timestamp >= paragraph.start_time && frame.timestamp <= paragraph.end_time) {
+                    const frameElement = document.querySelector(`[onclick*="toggleFrameSelection(${sectionIndex}, ${frameIndex}"]`);
+                    const isSelected = selectedFrames[sectionIndex].includes(frameIndex);
+                    
+                    if (frameElement && !isSelected) {
+                        if (isMaxReached) {
+                            frameElement.classList.add('disabled');
+                            frameElement.style.pointerEvents = 'none';
+                        } else {
+                            frameElement.classList.remove('disabled');
+                            frameElement.style.pointerEvents = 'auto';
+                        }
+                    }
+                }
+            });
         }
         
         function toggleTranscript(sectionIndex) {

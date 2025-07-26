@@ -20,6 +20,7 @@ class HugoGenerator:
     def __init__(self, config: Dict):
         self.config = config
         self.blog_formatter = None  # Initialize only when needed
+        self.modal_added = False  # Track if modal has been added to avoid duplicates
     
     def _get_blog_formatter(self):
         """Lazy initialization of blog formatter to avoid unnecessary Gemini API initialization."""
@@ -27,6 +28,42 @@ class HugoGenerator:
             from blog_formatter import BlogFormatter
             self.blog_formatter = BlogFormatter(self.config)
         return self.blog_formatter
+    
+    def _get_image_modal_html(self):
+        """Generate image modal HTML and JavaScript - only once per blog post."""
+        if self.modal_added:
+            return ""
+        
+        self.modal_added = True
+        return '''<!-- Image Modal for Click-to-Enlarge -->
+<div id="imageModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); cursor: pointer;" onclick="closeImageModal()">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); max-width: 90%; max-height: 90%;">
+        <img id="modalImage" src="" alt="" style="width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+        <div id="modalCaption" style="color: white; text-align: center; margin-top: 10px; font-size: 16px;"></div>
+    </div>
+    <span style="position: absolute; top: 15px; right: 35px; color: white; font-size: 40px; font-weight: bold; cursor: pointer; user-select: none;" onclick="closeImageModal()">&times;</span>
+</div>
+
+<script>
+function openImageModal(src, alt) {
+    document.getElementById('imageModal').style.display = 'block';
+    document.getElementById('modalImage').src = src;
+    document.getElementById('modalCaption').textContent = alt;
+    document.body.style.overflow = 'hidden';
+}
+
+function closeImageModal() {
+    document.getElementById('imageModal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+}
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeImageModal();
+    }
+});
+</script>'''
     
     def generate_blog_post(
         self, 
@@ -39,6 +76,9 @@ class HugoGenerator:
         template_path: Optional[str] = None
     ) -> str:
         """Generate a complete Hugo blog post with front matter and content in page bundle format."""
+        
+        # Reset modal flag for new blog post
+        self.modal_added = False
         
         # Create page bundle directory structure with kebab-case naming
         bundle_dir = self._create_page_bundle_structure(output_path, title)
@@ -89,6 +129,11 @@ class HugoGenerator:
             # Use default front matter + content structure
             final_content = f"---\n{front_matter}\n---\n\n{formatted_content}"
         
+        # Add modal HTML at the end if images were used
+        modal_html = self._get_image_modal_html()
+        if modal_html:
+            final_content += f"\n\n{modal_html}"
+        
         # Write index.md file in bundle directory
         index_path = os.path.join(bundle_dir, 'index.md')
         with open(index_path, 'w', encoding='utf-8') as f:
@@ -112,6 +157,9 @@ class HugoGenerator:
         template_path: Optional[str] = None
     ) -> str:
         """Generate a complete Hugo blog post using pre-formatted content (skips transcript formatting)."""
+        
+        # Reset modal flag for new blog post
+        self.modal_added = False
         
         # Create page bundle directory structure with kebab-case naming
         bundle_dir = self._create_page_bundle_structure(output_path, title)
@@ -148,6 +196,11 @@ class HugoGenerator:
         else:
             # Standard format: front matter + content
             final_content = f"{front_matter}\n\n{content_with_images}"
+        
+        # Add modal HTML at the end if images were used
+        modal_html = self._get_image_modal_html()
+        if modal_html:
+            final_content += f"\n\n{modal_html}"
         
         # Write index.md file in bundle directory
         index_path = os.path.join(bundle_dir, 'index.md')
@@ -788,14 +841,14 @@ class HugoGenerator:
         # Generate markdown with Hugo shortcode or standard markdown
         if self.config.get('use_hugo_shortcodes', False):
             if is_clustered:
-                return f'{{{{< figure src="{image_path}" alt="{alt_text}" width="400" class="inline" >}}}}'
+                return f'{{{{< figure src="{image_path}" alt="{alt_text}" width="50%" class="inline" >}}}}'
             else:
-                return f'{{{{< figure src="{image_path}" alt="{alt_text}" >}}}}'
+                return f'{{{{< figure src="{image_path}" alt="{alt_text}" width="50%" >}}}}'
         else:
-            if is_clustered:
-                return f'<img src="{image_path}" alt="{alt_text}" width="400" style="display: inline-block; margin: 5px;">'
-            else:
-                return f'![{alt_text}]({image_path})'
+            # Single image gets 50% width with click-to-enlarge modal
+            img_style = "width: 50% !important; height: auto !important; object-fit: cover; border-radius: 4px; display: block !important; margin: 20px auto !important; cursor: pointer !important;"
+            
+            return f'<img src="{image_path}" alt="{alt_text}" style="{img_style}" onclick="openImageModal(\'{image_path}\', \'{alt_text}\')">'
     
     def _generate_image_grid_markdown(self, frames: List[Dict], paragraph: List[Dict]) -> str:
         """Generate markdown for multiple images displayed in a responsive grid."""
@@ -816,40 +869,42 @@ class HugoGenerator:
         # Determine grid layout based on number of images
         num_images = len(frames)
         
+        # New sizing logic: 1 image = 50%, 2 images = 25% each, 3 images = ~16% each
         if use_flexbox_fallback:
             # Flexbox fallback for problematic themes
             grid_class = f"image-flex-{num_images}"
-            if num_images == 2:
-                grid_style = f"display: flex; flex-wrap: wrap; gap: {gap_size}; margin: 20px 0;"
-                img_width = "calc(50% - 5px)"
+            if num_images == 1:
+                grid_style = f"display: flex; justify-content: center; gap: {gap_size}; margin: 20px 0;"
+                img_width = "50%"
+            elif num_images == 2:
+                grid_style = f"display: flex; justify-content: center; gap: {gap_size}; margin: 20px 0;"
+                img_width = "25%"
             elif num_images == 3:
-                grid_style = f"display: flex; flex-wrap: wrap; gap: {gap_size}; margin: 20px 0;"
-                img_width = "calc(33.333% - 7px)"
-            elif num_images == 4:
-                grid_style = f"display: flex; flex-wrap: wrap; gap: {gap_size}; margin: 20px 0;"
-                img_width = "calc(50% - 5px)"
+                grid_style = f"display: flex; justify-content: center; gap: {gap_size}; margin: 20px 0;"
+                img_width = "16.666%"
             else:
-                grid_style = f"display: flex; flex-wrap: wrap; gap: {gap_size}; margin: 20px 0;"
-                img_width = "calc(33.333% - 7px)"
+                # Fallback for 4+ images (shouldn't happen with 3-image limit)
+                grid_style = f"display: flex; flex-wrap: wrap; justify-content: center; gap: {gap_size}; margin: 20px 0;"
+                img_width = "calc(25% - 5px)"
         else:
-            # Standard CSS Grid
-            if num_images == 2:
-                # 1 row, 2 columns
+            # Standard CSS Grid with centered layout
+            if num_images == 1:
+                grid_class = "image-grid-1"
+                grid_style = f"display: flex; justify-content: center; gap: {gap_size}; margin: 20px 0;"
+                img_width = "50%"
+            elif num_images == 2:
                 grid_class = "image-grid-2"
-                grid_style = f"display: grid; grid-template-columns: 1fr 1fr; gap: {gap_size}; margin: 20px 0;"
+                grid_style = f"display: flex; justify-content: center; gap: {gap_size}; margin: 20px 0;"
+                img_width = "25%"
             elif num_images == 3:
-                # 1 row, 3 columns
                 grid_class = "image-grid-3"
-                grid_style = f"display: grid; grid-template-columns: 1fr 1fr 1fr; gap: {gap_size}; margin: 20px 0;"
-            elif num_images == 4:
-                # 2 rows, 2 columns
-                grid_class = "image-grid-4"
-                grid_style = f"display: grid; grid-template-columns: 1fr 1fr; gap: {gap_size}; margin: 20px 0;"
+                grid_style = f"display: flex; justify-content: center; gap: {gap_size}; margin: 20px 0;"
+                img_width = "16.666%"
             else:
-                # For 5+ images, use a flexible grid with configurable max columns
+                # Fallback for 4+ images (shouldn't happen with 3-image limit)
                 grid_class = "image-grid-flex"
-                grid_style = f"display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: {gap_size}; margin: 20px 0;"
-            img_width = "100%"
+                grid_style = f"display: flex; flex-wrap: wrap; justify-content: center; gap: {gap_size}; margin: 20px 0;"
+                img_width = "calc(25% - 5px)"
         
         # Generate individual image elements
         image_elements = []
@@ -869,18 +924,18 @@ class HugoGenerator:
                         f'{{{{< figure src="{image_path}" alt="{alt_text}" class="grid-image" >}}}}'
                     )
             else:
-                # HTML img tag with defensive styling against theme interference
-                img_style = f"width: {img_width} !important; height: auto !important; object-fit: cover; border-radius: {border_radius}; display: block !important; max-width: {img_width} !important; margin: 0 !important; padding: 0 !important;"
+                # HTML img tag with click-to-enlarge modal functionality
+                img_style = f"width: {img_width} !important; height: auto !important; object-fit: cover; border-radius: {border_radius}; display: block !important; max-width: {img_width} !important; margin: 0 !important; padding: 0 !important; cursor: pointer !important;"
                 caption_style = "font-size: 0.8em !important; color: #666 !important; text-align: center !important; margin-top: 5px !important; margin-bottom: 0 !important; padding: 0 !important;"
                 
                 if show_timestamps:
                     image_elements.append(f'''<div class="grid-item">
-    <img src="{image_path}" alt="{alt_text}" style="{img_style}">
+    <img src="{image_path}" alt="{alt_text}" style="{img_style}" onclick="openImageModal('{image_path}', '{alt_text}')">
     <div style="{caption_style}">{timestamp:.1f}s</div>
 </div>''')
                 else:
                     image_elements.append(f'''<div class="grid-item">
-    <img src="{image_path}" alt="{alt_text}" style="{img_style}">
+    <img src="{image_path}" alt="{alt_text}" style="{img_style}" onclick="openImageModal('{image_path}', '{alt_text}')">
 </div>''')
         
         # Combine into grid container
@@ -1233,9 +1288,9 @@ class HugoGenerator:
         if self.config.get('use_hugo_shortcodes', False):
             return f'{{{{< figure src="{image_path}" alt="{alt_text}" caption="From: {section_title}" class="float-right" width="50%" >}}}}'
         else:
-            # Use HTML with inline styles - always float right at 50% width
+            # Use HTML with inline styles - always float right at 50% width with click-to-enlarge
             # Add some top margin to prevent images from sitting too close to headers
-            return f'<img src="{image_path}" alt="{alt_text}" style="width: 50%; float: right; margin-left: 20px; margin-bottom: 15px; margin-top: 10px; border-radius: 4px;" title="{section_title} at {timestamp:.1f}s">'
+            return f'<img src="{image_path}" alt="{alt_text}" style="width: 50%; float: right; margin-left: 20px; margin-bottom: 15px; margin-top: 10px; border-radius: 4px; cursor: pointer;" title="{section_title} at {timestamp:.1f}s" onclick="openImageModal(\'{image_path}\', \'{alt_text}\')">'
     
     def _generate_frame_grid_markdown_for_formatted_content(self, frames: List[Dict]) -> str:
         """Generate markdown for multiple frames in formatted content using consistent right-float layout."""
