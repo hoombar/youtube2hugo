@@ -1143,12 +1143,35 @@ class HugoGenerator:
         # Insert frames after corresponding headers
         result_lines = []
         current_header = None
+        self._pending_frames = []  # Initialize pending frames list
         
         for line in lines:
-            result_lines.append(line)
-            
             # Check if this line is a header
             header_match = re.match(r'^(#{1,3})\s+(.+)$', line)
+            
+            # Check if this line is content (not empty, not header)
+            is_content_line = line.strip() and not header_match
+            
+            # If we have pending frames and this is the first content line after a header, insert frames inline
+            if is_content_line and self._pending_frames:
+                
+                # Insert frames inline with the first content line for proper text wrapping
+                frames_to_insert = self._pending_frames[:]
+                self._pending_frames = []
+                
+                # Generate frame markdown
+                frame_markdowns = []
+                for frame in frames_to_insert:
+                    frame_markdown = self._generate_semantic_frame_markdown_for_formatted_content(frame)
+                    frame_markdowns.append(frame_markdown)
+                
+                # Insert frames before the content line so text flows around them
+                for frame_markdown in frame_markdowns:
+                    result_lines.append(frame_markdown)
+                    
+                logger.info(f"  🖼️  Inserted {len(frames_to_insert)} frames inline with content for text wrapping")
+            
+            result_lines.append(line)
             if header_match:
                 header_title = header_match.group(2).strip()
                 current_header = header_title
@@ -1162,29 +1185,25 @@ class HugoGenerator:
                         section_title == header_title):
                         matching_frames.extend(frames)
                 
-                # Insert matching frames after the header
+                # Store frames to insert at the beginning of the first paragraph in this section
                 if matching_frames:
-                    result_lines.append('')  # Empty line after header
-                    
-                    if len(matching_frames) == 1:
-                        # Single frame
-                        frame = matching_frames[0]
-                        image_markdown = self._generate_semantic_frame_markdown_for_formatted_content(frame)
-                        result_lines.append(image_markdown)
-                        logger.info(f"  🖼️  Inserted frame for section '{header_title}'")
-                    else:
-                        # Multiple frames - use grid
-                        grid_markdown = self._generate_frame_grid_markdown_for_formatted_content(matching_frames)
-                        result_lines.append(grid_markdown)
-                        logger.info(f"  🖼️  Inserted {len(matching_frames)} frames grid for section '{header_title}'")
-                    
-                    result_lines.append('')  # Empty line after images
+                    # We'll insert these frames when we encounter the first paragraph content
+                    # This allows text to wrap around the floated images properly
+                    self._pending_frames.extend(matching_frames)
+                    logger.info(f"  🖼️  Queued {len(matching_frames)} frames for section '{header_title}'")
                     
                     # Remove these frames from the pool so they don't get inserted again
                     for section_title in list(section_frames.keys()):
                         section_frames[section_title] = [f for f in section_frames[section_title] if f not in matching_frames]
                         if not section_frames[section_title]:
                             del section_frames[section_title]
+        
+        # Handle any remaining pending frames that didn't get inserted
+        if self._pending_frames:
+            logger.warning(f"⚠️  {len(self._pending_frames)} pending frames were not inserted (no content found)")
+            for frame in self._pending_frames:
+                frame_markdown = self._generate_semantic_frame_markdown_for_formatted_content(frame)
+                result_lines.append(frame_markdown)
         
         # Add any remaining frames at the end
         remaining_frames = []
@@ -1202,7 +1221,7 @@ class HugoGenerator:
         return '\n'.join(result_lines)
     
     def _generate_semantic_frame_markdown_for_formatted_content(self, frame: Dict) -> str:
-        """Generate markdown for a single semantic frame in formatted content."""
+        """Generate markdown for a single semantic frame in formatted content with consistent right-float layout."""
         
         image_path = self._get_hugo_image_path(frame)
         timestamp = frame['timestamp']
@@ -1212,70 +1231,24 @@ class HugoGenerator:
         alt_text = f"{section_title} demonstration at {timestamp:.1f}s"
         
         if self.config.get('use_hugo_shortcodes', False):
-            return f'{{{{< figure src="{image_path}" alt="{alt_text}" caption="From: {section_title}" >}}}}'
+            return f'{{{{< figure src="{image_path}" alt="{alt_text}" caption="From: {section_title}" class="float-right" width="50%" >}}}}'
         else:
-            return f'![{alt_text}]({image_path})'
+            # Use HTML with inline styles - always float right at 50% width
+            # Add some top margin to prevent images from sitting too close to headers
+            return f'<img src="{image_path}" alt="{alt_text}" style="width: 50%; float: right; margin-left: 20px; margin-bottom: 15px; margin-top: 10px; border-radius: 4px;" title="{section_title} at {timestamp:.1f}s">'
     
     def _generate_frame_grid_markdown_for_formatted_content(self, frames: List[Dict]) -> str:
-        """Generate markdown for a grid of frames in formatted content."""
+        """Generate markdown for multiple frames in formatted content using consistent right-float layout."""
         
-        show_timestamps = self.config.get('image_grid', {}).get('show_timestamps', True)
-        gap_size = self.config.get('image_grid', {}).get('gap_size', '10px')
-        border_radius = self.config.get('image_grid', {}).get('border_radius', '4px')
-        max_columns = self.config.get('image_grid', {}).get('max_columns', 3)
-        include_css_reset = self.config.get('image_grid', {}).get('include_css_reset', True)
-        use_flexbox_fallback = self.config.get('image_grid', {}).get('use_flexbox_fallback', False)
+        # For multiple frames, place them individually with consistent right-float
+        # They will stack vertically on the right side
+        frame_markdowns = []
+        for frame in frames:
+            frame_markdown = self._generate_semantic_frame_markdown_for_formatted_content(frame)
+            frame_markdowns.append(frame_markdown)
         
-        if self.config.get('use_hugo_shortcodes', False):
-            # Hugo shortcode version
-            shortcode_content = []
-            for frame in frames:
-                image_path = self._get_hugo_image_path(frame)
-                alt_text = f"{frame.get('section_title', 'Content')} at {frame['timestamp']:.1f}s"
-                timestamp = frame['timestamp']
-                section = frame.get('section_title', 'Unknown')
-                
-                if show_timestamps:
-                    shortcode_content.append(f'{{{{< figure src="{image_path}" alt="{alt_text}" caption="{timestamp:.1f}s - {section}" >}}}}')
-                else:
-                    shortcode_content.append(f'{{{{< figure src="{image_path}" alt="{alt_text}" >}}}}')
-            
-            return '\n'.join(shortcode_content)
-        else:
-            # Raw HTML grid version
-            grid_html = []
-            
-            # CSS Reset (if enabled)
-            if include_css_reset:
-                grid_html.append('<style>')
-                grid_html.append('.image-grid { all: initial; font-family: inherit; }')
-                grid_html.append('.image-grid * { all: unset; }')
-                grid_html.append('</style>')
-            
-            # Grid container
-            if use_flexbox_fallback:
-                grid_html.append(f'<div class="image-grid" style="display: flex; flex-wrap: wrap; gap: {gap_size}; margin: 20px 0;">')
-            else:
-                grid_html.append(f'<div class="image-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: {gap_size}; margin: 20px 0; max-width: 100%;">')
-            
-            for frame in frames:
-                image_path = self._get_hugo_image_path(frame)
-                alt_text = f"{frame.get('section_title', 'Content')} at {frame['timestamp']:.1f}s"
-                timestamp = frame['timestamp']
-                section = frame.get('section_title', 'Unknown')
-                
-                if use_flexbox_fallback:
-                    item_style = f"flex: 1 1 200px; max-width: calc(100% / {max_columns} - {gap_size});"
-                else:
-                    item_style = ""
-                
-                grid_html.append(f'  <div class="grid-item" style="{item_style}">')
-                grid_html.append(f'    <img src="{image_path}" alt="{alt_text}" style="width: 100%; height: auto; border-radius: {border_radius}; display: block;">')
-                
-                if show_timestamps:
-                    grid_html.append(f'    <p style="text-align: center; margin: 5px 0 0 0; font-size: 0.9em; color: #666;">{timestamp:.1f}s - {section}</p>')
-                
-                grid_html.append('  </div>')
-            
-            grid_html.append('</div>')
-            return '\n'.join(grid_html)
+        # Add some spacing between frames and a clear div at the end
+        result = '\n\n'.join(frame_markdowns)
+        result += '\n\n<div style="clear: both;"></div>'  # Clear floats after images
+        
+        return result

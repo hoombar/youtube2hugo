@@ -37,8 +37,12 @@ class HybridBlogCreator:
     """Integrated tool for AI-assisted blog creation with manual frame selection."""
     
     def __init__(self, config_path: str = "config.local.yaml"):
+        from config import Config
+        # Load both nested and flattened config for compatibility
         with open(config_path, 'r') as f:
             self.config = yaml.safe_load(f)
+        # Also load flattened config for template path compatibility
+        self.flattened_config = Config.load_local_config()
         
         self.app = Flask(__name__)
         self.setup_routes()
@@ -729,31 +733,51 @@ class HybridBlogCreator:
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             duration = float(result.stdout.strip())
             
-            # Extract frames every 0.5 seconds
-            cmd = [
-                'ffmpeg', '-y', '-i', video_path, 
-                '-vf', 'fps=2',  # 2 frames per second = every 0.5 seconds
-                '-q:v', '2',     # High quality
-                os.path.join(output_dir, 'frame_%05d.jpg')
-            ]
+            # Extract frames every 1 second using manual timestamp method for better reliability
+            # This approach extracts frames at exact timestamps rather than relying on fps filter
+            frame_times = []
+            current_time = 0.0
+            while current_time <= duration:
+                frame_times.append(current_time)
+                current_time += 1.0
             
-            logger.info(f"⚡ Extracting frames every 0.5s with ffmpeg...")
-            subprocess.run(cmd, capture_output=True, check=True)
+            logger.info(f"📊 Will extract {len(frame_times)} frames from 0s to {frame_times[-1]:.1f}s (video duration: {duration:.1f}s)")
+            logger.info(f"⚡ Extracting frames at specific timestamps with ffmpeg...")
             
-            # Create frame objects
+            # Extract frames at specific timestamps (more reliable than fps filter)
             frames = []
-            frame_files = sorted([f for f in os.listdir(output_dir) if f.startswith('frame_') and f.endswith('.jpg')])
-            
-            for i, filename in enumerate(frame_files):
-                timestamp = i * 0.5  # Every 0.5 seconds
-                if timestamp <= duration:
-                    frames.append(Frame(
-                        filename=filename,
-                        timestamp=timestamp,
-                        path=os.path.join(output_dir, filename)
-                    ))
-            
-            logger.info(f"✅ Extracted {len(frames)} raw frames in {duration:.1f}s video")
+            for i, timestamp in enumerate(frame_times):
+                filename = f"frame_{i:05d}.jpg"
+                filepath = os.path.join(output_dir, filename)
+                
+                # Extract frame at specific timestamp
+                cmd = [
+                    'ffmpeg', '-y', '-ss', str(timestamp), '-i', video_path,
+                    '-vframes', '1',  # Extract exactly 1 frame
+                    '-q:v', '2',      # High quality
+                    '-an',            # No audio
+                    filepath
+                ]
+                
+                try:
+                    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                    
+                    # Verify the frame was actually created
+                    if os.path.exists(filepath):
+                        frames.append(Frame(
+                            filename=filename,
+                            timestamp=timestamp,
+                            path=filepath
+                        ))
+                        if i % 10 == 0:  # Log progress every 10 frames (since we have fewer frames now)
+                            logger.info(f"  📸 Extracted frame {i+1}/{len(frame_times)} at {timestamp:.1f}s")
+                    else:
+                        logger.warning(f"⚠️  Frame not created at {timestamp:.1f}s")
+                        
+                except subprocess.CalledProcessError as e:
+                    logger.warning(f"⚠️  Failed to extract frame at {timestamp:.1f}s: {e}")
+                    
+            logger.info(f"✅ Successfully extracted {len(frames)} frames using timestamp method")
             return frames
             
         except subprocess.CalledProcessError as e:
@@ -775,10 +799,19 @@ class HybridBlogCreator:
         try:
             cap = cv2.VideoCapture(video_path)
             fps = cap.get(cv2.CAP_PROP_FPS)
-            frame_interval = int(fps * 0.5)  # Every 0.5 seconds
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            duration = total_frames / fps if fps > 0 else 0
+            
+            logger.info(f"📹 CV2: Video has {total_frames} frames at {fps:.2f} fps ({duration:.2f}s)")
+            
+            frame_interval = int(fps * 1.0)  # Every 1 second
+            if frame_interval == 0:
+                frame_interval = 1  # Minimum interval
             
             frame_count = 0
             extracted_count = 0
+            
+            logger.info(f"📊 CV2: Extracting every {frame_interval} frames (every {frame_interval/fps:.1f}s - targeting 1s intervals)")
             
             while True:
                 ret, frame = cap.read()
@@ -797,11 +830,21 @@ class HybridBlogCreator:
                         path=filepath
                     ))
                     extracted_count += 1
+                    
+                    if extracted_count % 10 == 0:  # Progress every 10 frames (since we have fewer frames now)
+                        logger.info(f"  📸 CV2: Extracted {extracted_count} frames, current time: {timestamp:.1f}s")
                 
                 frame_count += 1
             
             cap.release()
-            logger.info(f"✅ CV2 extracted {len(frames)} raw frames")
+            
+            if frames:
+                last_timestamp = frames[-1].timestamp
+                coverage = (last_timestamp / duration) * 100 if duration > 0 else 0
+                logger.info(f"✅ CV2 extracted {len(frames)} frames, coverage: {last_timestamp:.1f}s/{duration:.1f}s ({coverage:.1f}%)")
+            else:
+                logger.warning("⚠️  CV2 extracted no frames!")
+                
             return frames
             
         except Exception as e:
@@ -1030,11 +1073,8 @@ class HybridBlogCreator:
         hugo_generator = HugoGenerator(self.config)
         
         try:
-            # Create modified blog content with selected frames
-            blog_content = self._insert_selected_frames_into_content(
-                self.current_session['blog_content_template'],
-                selections
-            )
+            # Use original blog content template - let Hugo generator handle frame insertion
+            blog_content = self.current_session['blog_content_template']
             
             # Generate final blog post using pre-formatted content (no Gemini needed!)
             # Create output path
@@ -1052,12 +1092,17 @@ class HybridBlogCreator:
                 'title': self.current_session['title']
             }
             
+            # Get template path from config - try both nested and flattened formats
+            template_path = (self.flattened_config.get('template_path') or 
+                           self.config.get('template', {}).get('path'))
+            
             result_path = hugo_generator.generate_blog_post_with_formatted_content(
                 self.current_session['title'],
                 blog_content,
                 selected_frames,
                 video_info,
-                output_dir
+                output_dir,
+                template_path=template_path
             )
             
             result = {'output_file': result_path}
@@ -1075,36 +1120,6 @@ class HybridBlogCreator:
             logger.error(f"Failed to generate blog: {e}")
             raise
     
-    def _insert_selected_frames_into_content(self, template_content: str, selections: Dict) -> str:
-        """Insert selected frames into the blog content template."""
-        content = template_content
-        
-        # Replace image placeholders with actual frame references
-        for section_data in selections['sections']:
-            section_title = section_data['section_title']
-            selected_frames = section_data['selected_frames']
-            
-            if selected_frames:
-                # Create image grid for this section
-                frame_refs = []
-                for frame_path in selected_frames:
-                    filename = os.path.basename(frame_path)
-                    frame_refs.append(f"![Frame]({filename})")
-                
-                images_text = '\n'.join(frame_refs)
-                
-                # Replace placeholder or append to section
-                section_pattern = f"## {section_title}"
-                if section_pattern in content:
-                    content = content.replace(
-                        section_pattern,
-                        f"{section_pattern}\n\n{images_text}\n"
-                    )
-        
-        # Remove any remaining placeholders
-        content = content.replace("{{< image-placeholder >}}", "")
-        
-        return content
     
     def run(self, host='127.0.0.1', port=5001, debug=True):
         """Start the web interface."""
