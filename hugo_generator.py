@@ -10,7 +10,6 @@ import cv2
 import numpy as np
 from PIL import Image
 import hashlib
-from blog_formatter import BlogFormatter
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,7 +19,14 @@ class HugoGenerator:
     
     def __init__(self, config: Dict):
         self.config = config
-        self.blog_formatter = BlogFormatter(config)
+        self.blog_formatter = None  # Initialize only when needed
+    
+    def _get_blog_formatter(self):
+        """Lazy initialization of blog formatter to avoid unnecessary Gemini API initialization."""
+        if self.blog_formatter is None:
+            from blog_formatter import BlogFormatter
+            self.blog_formatter = BlogFormatter(self.config)
+        return self.blog_formatter
     
     def generate_blog_post(
         self, 
@@ -59,8 +65,8 @@ class HugoGenerator:
                 transcript_segments, frame_data, bundle_dir
             )
         
-        # Second pass: Format content as blog post with Gemini
-        formatted_content = self.blog_formatter.format_content_with_images(
+        # Format content as blog post with Gemini (applies transcript corrections and blog structure)
+        formatted_content = self._get_blog_formatter().format_content_with_images(
             raw_content, title, frame_data
         )
         
@@ -92,6 +98,66 @@ class HugoGenerator:
         self._cleanup_unused_images(bundle_dir, final_content)
         
         logger.info(f"Generated Hugo page bundle: {bundle_dir}")
+        logger.info(f"Blog post created at: {index_path}")
+        return final_content
+    
+    def generate_blog_post_with_formatted_content(
+        self, 
+        title: str,
+        formatted_content: str,
+        frame_data: List[Dict],
+        video_info: Dict,
+        output_path: str,
+        front_matter_data: Optional[Dict] = None,
+        template_path: Optional[str] = None
+    ) -> str:
+        """Generate a complete Hugo blog post using pre-formatted content (skips transcript formatting)."""
+        
+        # Create page bundle directory structure with kebab-case naming
+        bundle_dir = self._create_page_bundle_structure(output_path, title)
+        
+        # Copy images to bundle directory
+        self._copy_images_to_bundle(frame_data, bundle_dir)
+        
+        # Generate front matter
+        front_matter = self._generate_front_matter(
+            title, video_info, front_matter_data
+        )
+        
+        # Insert frames into the pre-formatted content
+        logger.info("📝 Inserting frames into pre-formatted blog content...")
+        content_with_images = self._insert_frames_into_formatted_content(
+            formatted_content, frame_data, bundle_dir
+        )
+        
+        # Apply template if provided (simple substitution, no additional Gemini processing)
+        if template_path:
+            template_variables = {
+                'title': title,
+                'date': datetime.now().strftime('%Y-%m-%dT00:00:00Z'),
+                'content': content_with_images
+            }
+            # Add custom front matter variables
+            if front_matter_data:
+                template_variables.update(front_matter_data)
+            
+            # Simple template substitution without additional Gemini processing
+            final_content = self._apply_simple_template(
+                template_path, template_variables
+            )
+        else:
+            # Standard format: front matter + content
+            final_content = f"{front_matter}\n\n{content_with_images}"
+        
+        # Write index.md file in bundle directory
+        index_path = os.path.join(bundle_dir, 'index.md')
+        with open(index_path, 'w', encoding='utf-8') as f:
+            f.write(final_content)
+        
+        # Clean up unused images from the bundle directory
+        self._cleanup_unused_images(bundle_dir, final_content)
+        
+        logger.info(f"Generated Hugo page bundle with pre-formatted content: {bundle_dir}")
         logger.info(f"Blog post created at: {index_path}")
         return final_content
     
@@ -1055,3 +1121,161 @@ class HugoGenerator:
             logger.error(f"Failed to apply template {template_path}: {e}")
             # Fallback to default structure
             return f"---\ntitle: {variables.get('title', 'Untitled')}\ndate: {variables.get('date', '')}\n---\n\n{variables.get('content', '')}"
+    
+    def _insert_frames_into_formatted_content(self, formatted_content: str, frame_data: List[Dict], bundle_dir: str) -> str:
+        """Insert frames into pre-formatted blog content at appropriate locations."""
+        
+        if not frame_data:
+            return formatted_content
+        
+        # Split content into sections based on headers
+        import re
+        lines = formatted_content.split('\n')
+        
+        # Group frames by their section titles (from semantic selection)
+        section_frames = {}
+        for frame in frame_data:
+            section_title = frame.get('section_title', 'General')
+            if section_title not in section_frames:
+                section_frames[section_title] = []
+            section_frames[section_title].append(frame)
+        
+        # Insert frames after corresponding headers
+        result_lines = []
+        current_header = None
+        
+        for line in lines:
+            result_lines.append(line)
+            
+            # Check if this line is a header
+            header_match = re.match(r'^(#{1,3})\s+(.+)$', line)
+            if header_match:
+                header_title = header_match.group(2).strip()
+                current_header = header_title
+                
+                # Find frames that belong to this section
+                matching_frames = []
+                for section_title, frames in section_frames.items():
+                    # Use fuzzy matching for section titles
+                    if (section_title.lower() in header_title.lower() or 
+                        header_title.lower() in section_title.lower() or
+                        section_title == header_title):
+                        matching_frames.extend(frames)
+                
+                # Insert matching frames after the header
+                if matching_frames:
+                    result_lines.append('')  # Empty line after header
+                    
+                    if len(matching_frames) == 1:
+                        # Single frame
+                        frame = matching_frames[0]
+                        image_markdown = self._generate_semantic_frame_markdown_for_formatted_content(frame)
+                        result_lines.append(image_markdown)
+                        logger.info(f"  🖼️  Inserted frame for section '{header_title}'")
+                    else:
+                        # Multiple frames - use grid
+                        grid_markdown = self._generate_frame_grid_markdown_for_formatted_content(matching_frames)
+                        result_lines.append(grid_markdown)
+                        logger.info(f"  🖼️  Inserted {len(matching_frames)} frames grid for section '{header_title}'")
+                    
+                    result_lines.append('')  # Empty line after images
+                    
+                    # Remove these frames from the pool so they don't get inserted again
+                    for section_title in list(section_frames.keys()):
+                        section_frames[section_title] = [f for f in section_frames[section_title] if f not in matching_frames]
+                        if not section_frames[section_title]:
+                            del section_frames[section_title]
+        
+        # Add any remaining frames at the end
+        remaining_frames = []
+        for frames in section_frames.values():
+            remaining_frames.extend(frames)
+        
+        if remaining_frames:
+            result_lines.extend(['', '## Additional Images', ''])
+            for frame in remaining_frames:
+                image_markdown = self._generate_semantic_frame_markdown_for_formatted_content(frame)
+                result_lines.append(image_markdown)
+                result_lines.append('')
+            logger.info(f"  🖼️  Added {len(remaining_frames)} remaining frames at end")
+        
+        return '\n'.join(result_lines)
+    
+    def _generate_semantic_frame_markdown_for_formatted_content(self, frame: Dict) -> str:
+        """Generate markdown for a single semantic frame in formatted content."""
+        
+        image_path = self._get_hugo_image_path(frame)
+        timestamp = frame['timestamp']
+        section_title = frame.get('section_title', 'Content')
+        
+        # Generate alt text
+        alt_text = f"{section_title} demonstration at {timestamp:.1f}s"
+        
+        if self.config.get('use_hugo_shortcodes', False):
+            return f'{{{{< figure src="{image_path}" alt="{alt_text}" caption="From: {section_title}" >}}}}'
+        else:
+            return f'![{alt_text}]({image_path})'
+    
+    def _generate_frame_grid_markdown_for_formatted_content(self, frames: List[Dict]) -> str:
+        """Generate markdown for a grid of frames in formatted content."""
+        
+        show_timestamps = self.config.get('image_grid', {}).get('show_timestamps', True)
+        gap_size = self.config.get('image_grid', {}).get('gap_size', '10px')
+        border_radius = self.config.get('image_grid', {}).get('border_radius', '4px')
+        max_columns = self.config.get('image_grid', {}).get('max_columns', 3)
+        include_css_reset = self.config.get('image_grid', {}).get('include_css_reset', True)
+        use_flexbox_fallback = self.config.get('image_grid', {}).get('use_flexbox_fallback', False)
+        
+        if self.config.get('use_hugo_shortcodes', False):
+            # Hugo shortcode version
+            shortcode_content = []
+            for frame in frames:
+                image_path = self._get_hugo_image_path(frame)
+                alt_text = f"{frame.get('section_title', 'Content')} at {frame['timestamp']:.1f}s"
+                timestamp = frame['timestamp']
+                section = frame.get('section_title', 'Unknown')
+                
+                if show_timestamps:
+                    shortcode_content.append(f'{{{{< figure src="{image_path}" alt="{alt_text}" caption="{timestamp:.1f}s - {section}" >}}}}')
+                else:
+                    shortcode_content.append(f'{{{{< figure src="{image_path}" alt="{alt_text}" >}}}}')
+            
+            return '\n'.join(shortcode_content)
+        else:
+            # Raw HTML grid version
+            grid_html = []
+            
+            # CSS Reset (if enabled)
+            if include_css_reset:
+                grid_html.append('<style>')
+                grid_html.append('.image-grid { all: initial; font-family: inherit; }')
+                grid_html.append('.image-grid * { all: unset; }')
+                grid_html.append('</style>')
+            
+            # Grid container
+            if use_flexbox_fallback:
+                grid_html.append(f'<div class="image-grid" style="display: flex; flex-wrap: wrap; gap: {gap_size}; margin: 20px 0;">')
+            else:
+                grid_html.append(f'<div class="image-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: {gap_size}; margin: 20px 0; max-width: 100%;">')
+            
+            for frame in frames:
+                image_path = self._get_hugo_image_path(frame)
+                alt_text = f"{frame.get('section_title', 'Content')} at {frame['timestamp']:.1f}s"
+                timestamp = frame['timestamp']
+                section = frame.get('section_title', 'Unknown')
+                
+                if use_flexbox_fallback:
+                    item_style = f"flex: 1 1 200px; max-width: calc(100% / {max_columns} - {gap_size});"
+                else:
+                    item_style = ""
+                
+                grid_html.append(f'  <div class="grid-item" style="{item_style}">')
+                grid_html.append(f'    <img src="{image_path}" alt="{alt_text}" style="width: 100%; height: auto; border-radius: {border_radius}; display: block;">')
+                
+                if show_timestamps:
+                    grid_html.append(f'    <p style="text-align: center; margin: 5px 0 0 0; font-size: 0.9em; color: #666;">{timestamp:.1f}s - {section}</p>')
+                
+                grid_html.append('  </div>')
+            
+            grid_html.append('</div>')
+            return '\n'.join(grid_html)

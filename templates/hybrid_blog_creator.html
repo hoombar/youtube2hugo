@@ -198,9 +198,10 @@
         
         .frames-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            grid-template-columns: 1fr 1fr 1fr 1fr;
             gap: 15px;
             margin-top: 15px;
+            max-width: 100%;
         }
         
         .frame-item {
@@ -211,6 +212,9 @@
             cursor: pointer;
             transition: all 0.3s;
             background: white;
+            width: 100%;
+            max-width: none;
+            min-width: 0;
         }
         
         .frame-item:hover {
@@ -229,6 +233,8 @@
         .frame-item img {
             width: 100%;
             height: auto;
+            aspect-ratio: 16 / 9;
+            object-fit: cover;
             border-radius: 5px;
             margin-bottom: 5px;
         }

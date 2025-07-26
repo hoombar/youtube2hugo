@@ -1,0 +1,1930 @@
+{
+  "video_id": "0713",
+  "video_path": "/Users/ben/Desktop/Youtube edits/0713/0713.mov",
+  "sections": [
+    {
+      "title": "Building a Robust ZigBee Network: A Comprehensive Guide to Reliability and Troubleshooting",
+      "start_time": 0,
+      "end_time": 43.2,
+      "available_frames": [
+        {
+          "face_ratio": 0.06146267361111111,
+          "filename": "frame_0.0s.jpg",
+          "path": "temp_frames/frame_0.0s.jpg",
+          "score": 108.20000000000005,
+          "should_include": true,
+          "timestamp": 0
+        },
+        {
+          "face_ratio": 0.06781684027777778,
+          "filename": "frame_4.5s.jpg",
+          "path": "temp_frames/frame_4.5s.jpg",
+          "score": 186.93036509363242,
+          "should_include": true,
+          "timestamp": 4.5
+        },
+        {
+          "face_ratio": 0.0625,
+          "filename": "frame_6.0s.jpg",
+          "path": "temp_frames/frame_6.0s.jpg",
+          "score": 127.22314174589587,
+          "should_include": true,
+          "timestamp": 6
+        },
+        {
+          "face_ratio": 0.06460069444444444,
+          "filename": "frame_6.5s.jpg",
+          "path": "temp_frames/frame_6.5s.jpg",
+          "score": 160.45343846016158,
+          "should_include": true,
+          "timestamp": 6.5
+        },
+        {
+          "face_ratio": 0.07111111111111111,
+          "filename": "frame_7.0s.jpg",
+          "path": "temp_frames/frame_7.0s.jpg",
+          "score": 166.1575489993237,
+          "should_include": true,
+          "timestamp": 7
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_7.5s.jpg",
+          "path": "temp_frames/frame_7.5s.jpg",
+          "score": 1179.4,
+          "should_include": true,
+          "timestamp": 7.5
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_8.0s.jpg",
+          "path": "temp_frames/frame_8.0s.jpg",
+          "score": 1139.7456528053247,
+          "should_include": true,
+          "timestamp": 8
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_8.3s.jpg",
+          "path": "temp_frames/frame_8.3s.jpg",
+          "score": 1047.1178128492834,
+          "should_include": true,
+          "timestamp": 8.26
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_8.5s.jpg",
+          "path": "temp_frames/frame_8.5s.jpg",
+          "score": 1124.9039275248756,
+          "should_include": true,
+          "timestamp": 8.5
+        },
+        {
+          "face_ratio": 0.06354600694444444,
+          "filename": "frame_10.0s.jpg",
+          "path": "temp_frames/frame_10.0s.jpg",
+          "score": 168.20000000000005,
+          "should_include": true,
+          "timestamp": 10
+        },
+        {
+          "face_ratio": 0.06781684027777778,
+          "filename": "frame_10.5s.jpg",
+          "path": "temp_frames/frame_10.5s.jpg",
+          "score": 193.82084144414227,
+          "should_include": true,
+          "timestamp": 10.5
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_11.0s.jpg",
+          "path": "temp_frames/frame_11.0s.jpg",
+          "score": 1120.9096471837195,
+          "should_include": true,
+          "timestamp": 11
+        },
+        {
+          "face_ratio": 0.07000434027777777,
+          "filename": "frame_12.0s.jpg",
+          "path": "temp_frames/frame_12.0s.jpg",
+          "score": 161.9304542225866,
+          "should_include": true,
+          "timestamp": 12
+        },
+        {
+          "face_ratio": 0.07677517361111111,
+          "filename": "frame_12.3s.jpg",
+          "path": "temp_frames/frame_12.3s.jpg",
+          "score": 140.93400497042649,
+          "should_include": true,
+          "timestamp": 12.3
+        },
+        {
+          "face_ratio": 0.07111111111111111,
+          "filename": "frame_12.5s.jpg",
+          "path": "temp_frames/frame_12.5s.jpg",
+          "score": 161.15123778272266,
+          "should_include": true,
+          "timestamp": 12.5
+        },
+        {
+          "face_ratio": 0.07677517361111111,
+          "filename": "frame_13.0s.jpg",
+          "path": "temp_frames/frame_13.0s.jpg",
+          "score": 128.20630775017185,
+          "should_include": true,
+          "timestamp": 13
+        },
+        {
+          "face_ratio": 0.07335069444444445,
+          "filename": "frame_14.0s.jpg",
+          "path": "temp_frames/frame_14.0s.jpg",
+          "score": 102.95451731592254,
+          "should_include": true,
+          "timestamp": 14
+        },
+        {
+          "face_ratio": 0.06781684027777778,
+          "filename": "frame_14.5s.jpg",
+          "path": "temp_frames/frame_14.5s.jpg",
+          "score": 141.15230884558707,
+          "should_include": true,
+          "timestamp": 14.5
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_15.5s.jpg",
+          "path": "temp_frames/frame_15.5s.jpg",
+          "score": 829.7765990876646,
+          "should_include": true,
+          "timestamp": 15.5
+        },
+        {
+          "face_ratio": 0.07111111111111111,
+          "filename": "frame_16.0s.jpg",
+          "path": "temp_frames/frame_16.0s.jpg",
+          "score": 247.94006269180272,
+          "should_include": true,
+          "timestamp": 16
+        },
+        {
+          "face_ratio": 0.075625,
+          "filename": "frame_16.2s.jpg",
+          "path": "temp_frames/frame_16.2s.jpg",
+          "score": 66.50199074639852,
+          "should_include": true,
+          "timestamp": 16.16
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_16.5s.jpg",
+          "path": "temp_frames/frame_16.5s.jpg",
+          "score": 1283.2,
+          "should_include": true,
+          "timestamp": 16.5
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_17.0s.jpg",
+          "path": "temp_frames/frame_17.0s.jpg",
+          "score": 1127.9529278608095,
+          "should_include": true,
+          "timestamp": 17
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_17.2s.jpg",
+          "path": "temp_frames/frame_17.2s.jpg",
+          "score": 1125.4816694596414,
+          "should_include": true,
+          "timestamp": 17.16
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_17.5s.jpg",
+          "path": "temp_frames/frame_17.5s.jpg",
+          "score": 1125.9923722724338,
+          "should_include": true,
+          "timestamp": 17.5
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_18.0s.jpg",
+          "path": "temp_frames/frame_18.0s.jpg",
+          "score": 1125.5803518284688,
+          "should_include": true,
+          "timestamp": 18
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_18.2s.jpg",
+          "path": "temp_frames/frame_18.2s.jpg",
+          "score": 1166.0188041093481,
+          "should_include": true,
+          "timestamp": 18.16
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_19.0s.jpg",
+          "path": "temp_frames/frame_19.0s.jpg",
+          "score": 760.7247672001525,
+          "should_include": true,
+          "timestamp": 19
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_19.5s.jpg",
+          "path": "temp_frames/frame_19.5s.jpg",
+          "score": 769.7912948802496,
+          "should_include": true,
+          "timestamp": 19.5
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_20.0s.jpg",
+          "path": "temp_frames/frame_20.0s.jpg",
+          "score": 633.2,
+          "should_include": true,
+          "timestamp": 20
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_21.2s.jpg",
+          "path": "temp_frames/frame_21.2s.jpg",
+          "score": 1007.7898687227464,
+          "should_include": true,
+          "timestamp": 21.2
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_21.5s.jpg",
+          "path": "temp_frames/frame_21.5s.jpg",
+          "score": 1123.2,
+          "should_include": true,
+          "timestamp": 21.5
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_21.7s.jpg",
+          "path": "temp_frames/frame_21.7s.jpg",
+          "score": 1007.8472897408844,
+          "should_include": true,
+          "timestamp": 21.7
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_22.0s.jpg",
+          "path": "temp_frames/frame_22.0s.jpg",
+          "score": 1007.5009016278091,
+          "should_include": true,
+          "timestamp": 22
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_22.2s.jpg",
+          "path": "temp_frames/frame_22.2s.jpg",
+          "score": 1006.9135517047565,
+          "should_include": true,
+          "timestamp": 22.2
+        },
+        {
+          "face_ratio": 0.0594140625,
+          "filename": "frame_22.5s.jpg",
+          "path": "temp_frames/frame_22.5s.jpg",
+          "score": 160.01241514356718,
+          "should_include": true,
+          "timestamp": 22.5
+        },
+        {
+          "face_ratio": 0.0625,
+          "filename": "frame_22.9s.jpg",
+          "path": "temp_frames/frame_22.9s.jpg",
+          "score": 158.72669616593464,
+          "should_include": true,
+          "timestamp": 22.95
+        },
+        {
+          "face_ratio": 0.06890625,
+          "filename": "frame_23.2s.jpg",
+          "path": "temp_frames/frame_23.2s.jpg",
+          "score": 164.69438166456985,
+          "should_include": true,
+          "timestamp": 23.2
+        },
+        {
+          "face_ratio": 0.06890625,
+          "filename": "frame_23.4s.jpg",
+          "path": "temp_frames/frame_23.4s.jpg",
+          "score": 243.20000000000005,
+          "should_include": true,
+          "timestamp": 23.45
+        },
+        {
+          "face_ratio": 0.07448350694444444,
+          "filename": "frame_23.7s.jpg",
+          "path": "temp_frames/frame_23.7s.jpg",
+          "score": 185.73582083042743,
+          "should_include": true,
+          "timestamp": 23.7
+        },
+        {
+          "face_ratio": 0.0625,
+          "filename": "frame_24.0s.jpg",
+          "path": "temp_frames/frame_24.0s.jpg",
+          "score": 188.55902028417484,
+          "should_include": true,
+          "timestamp": 24
+        },
+        {
+          "face_ratio": 0.07111111111111111,
+          "filename": "frame_25.0s.jpg",
+          "path": "temp_frames/frame_25.0s.jpg",
+          "score": 153.03815301241355,
+          "should_include": true,
+          "timestamp": 25
+        },
+        {
+          "face_ratio": 0.07000434027777777,
+          "filename": "frame_25.5s.jpg",
+          "path": "temp_frames/frame_25.5s.jpg",
+          "score": 162.04783802799489,
+          "should_include": true,
+          "timestamp": 25.5
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_26.5s.jpg",
+          "path": "temp_frames/frame_26.5s.jpg",
+          "score": 793.2,
+          "should_include": true,
+          "timestamp": 26.5
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_27.0s.jpg",
+          "path": "temp_frames/frame_27.0s.jpg",
+          "score": 606.5315855636954,
+          "should_include": true,
+          "timestamp": 27
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_27.5s.jpg",
+          "path": "temp_frames/frame_27.5s.jpg",
+          "score": 707.2493101216496,
+          "should_include": true,
+          "timestamp": 27.5
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_28.0s.jpg",
+          "path": "temp_frames/frame_28.0s.jpg",
+          "score": 728.4369469346935,
+          "should_include": true,
+          "timestamp": 28
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_28.5s.jpg",
+          "path": "temp_frames/frame_28.5s.jpg",
+          "score": 694.1957502147899,
+          "should_include": true,
+          "timestamp": 28.5
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_29.0s.jpg",
+          "path": "temp_frames/frame_29.0s.jpg",
+          "score": 719.3294095077248,
+          "should_include": true,
+          "timestamp": 29
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_30.5s.jpg",
+          "path": "temp_frames/frame_30.5s.jpg",
+          "score": 681.1915334985306,
+          "should_include": true,
+          "timestamp": 30.5
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_31.0s.jpg",
+          "path": "temp_frames/frame_31.0s.jpg",
+          "score": 677.8800202218999,
+          "should_include": true,
+          "timestamp": 31
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_31.3s.jpg",
+          "path": "temp_frames/frame_31.3s.jpg",
+          "score": 677.5988771893886,
+          "should_include": true,
+          "timestamp": 31.33
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_31.6s.jpg",
+          "path": "temp_frames/frame_31.6s.jpg",
+          "score": 640.7778092561206,
+          "should_include": true,
+          "timestamp": 31.58
+        },
+        {
+          "face_ratio": 0.07677517361111111,
+          "filename": "frame_31.8s.jpg",
+          "path": "temp_frames/frame_31.8s.jpg",
+          "score": 273.20000000000005,
+          "should_include": true,
+          "timestamp": 31.83
+        },
+        {
+          "face_ratio": 0.08506944444444445,
+          "filename": "frame_32.1s.jpg",
+          "path": "temp_frames/frame_32.1s.jpg",
+          "score": 128.17824908075795,
+          "should_include": true,
+          "timestamp": 32.08
+        },
+        {
+          "face_ratio": 0.07448350694444444,
+          "filename": "frame_32.3s.jpg",
+          "path": "temp_frames/frame_32.3s.jpg",
+          "score": 184.5883032507669,
+          "should_include": true,
+          "timestamp": 32.33
+        },
+        {
+          "face_ratio": 0.08027777777777778,
+          "filename": "frame_32.6s.jpg",
+          "path": "temp_frames/frame_32.6s.jpg",
+          "score": 155.05584290722527,
+          "should_include": true,
+          "timestamp": 32.58
+        },
+        {
+          "face_ratio": 0.07000434027777777,
+          "filename": "frame_33.0s.jpg",
+          "path": "temp_frames/frame_33.0s.jpg",
+          "score": 101.32237115705573,
+          "should_include": true,
+          "timestamp": 33
+        },
+        {
+          "face_ratio": 0.06354600694444444,
+          "filename": "frame_33.8s.jpg",
+          "path": "temp_frames/frame_33.8s.jpg",
+          "score": 170.1322195363848,
+          "should_include": true,
+          "timestamp": 33.83
+        },
+        {
+          "face_ratio": 0.06890625,
+          "filename": "frame_34.0s.jpg",
+          "path": "temp_frames/frame_34.0s.jpg",
+          "score": 101.02135510904361,
+          "should_include": true,
+          "timestamp": 34
+        },
+        {
+          "face_ratio": 0.0791015625,
+          "filename": "frame_35.0s.jpg",
+          "path": "temp_frames/frame_35.0s.jpg",
+          "score": 127.04035513122676,
+          "should_include": true,
+          "timestamp": 35
+        },
+        {
+          "face_ratio": 0.07000434027777777,
+          "filename": "frame_36.0s.jpg",
+          "path": "temp_frames/frame_36.0s.jpg",
+          "score": 121.21903484867426,
+          "should_include": true,
+          "timestamp": 36
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_37.0s.jpg",
+          "path": "temp_frames/frame_37.0s.jpg",
+          "score": 976.4,
+          "should_include": true,
+          "timestamp": 37
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_38.0s.jpg",
+          "path": "temp_frames/frame_38.0s.jpg",
+          "score": 928.6382892525255,
+          "should_include": true,
+          "timestamp": 38
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_39.0s.jpg",
+          "path": "temp_frames/frame_39.0s.jpg",
+          "score": 1066.5806972132823,
+          "should_include": true,
+          "timestamp": 39
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_40.0s.jpg",
+          "path": "temp_frames/frame_40.0s.jpg",
+          "score": 892.5665207799293,
+          "should_include": true,
+          "timestamp": 40
+        },
+        {
+          "face_ratio": 0.1254340277777778,
+          "filename": "frame_41.0s.jpg",
+          "path": "temp_frames/frame_41.0s.jpg",
+          "score": 108.48954386566277,
+          "should_include": true,
+          "timestamp": 41
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_43.0s.jpg",
+          "path": "temp_frames/frame_43.0s.jpg",
+          "score": 284.9594881375714,
+          "should_include": true,
+          "timestamp": 43
+        }
+      ],
+      "selected_frames": [
+        "temp_frames/frame_7.5s.jpg",
+        "temp_frames/frame_19.0s.jpg",
+        "temp_frames/frame_16.5s.jpg",
+        "temp_frames/frame_22.2s.jpg",
+        "temp_frames/frame_31.6s.jpg"
+      ]
+    },
+    {
+      "title": "The Coordinator: Foundation of Your Network",
+      "start_time": 43.2,
+      "end_time": 61.5,
+      "available_frames": [
+        {
+          "face_ratio": 0,
+          "filename": "frame_43.2s.jpg",
+          "path": "temp_frames/frame_43.2s.jpg",
+          "score": 181.00000005587935,
+          "should_include": true,
+          "timestamp": 43.24
+        },
+        {
+          "face_ratio": 0.06043402777777778,
+          "filename": "frame_44.0s.jpg",
+          "path": "temp_frames/frame_44.0s.jpg",
+          "score": 203.20000000000005,
+          "should_include": true,
+          "timestamp": 44
+        },
+        {
+          "face_ratio": 0.08751736111111111,
+          "filename": "frame_45.0s.jpg",
+          "path": "temp_frames/frame_45.0s.jpg",
+          "score": 196.91877487365616,
+          "should_include": true,
+          "timestamp": 45
+        },
+        {
+          "face_ratio": 0.07793402777777778,
+          "filename": "frame_45.2s.jpg",
+          "path": "temp_frames/frame_45.2s.jpg",
+          "score": 210.50801010741134,
+          "should_include": true,
+          "timestamp": 45.24
+        },
+        {
+          "face_ratio": 0.0791015625,
+          "filename": "frame_46.0s.jpg",
+          "path": "temp_frames/frame_46.0s.jpg",
+          "score": 192.80941477463773,
+          "should_include": true,
+          "timestamp": 46
+        },
+        {
+          "face_ratio": 0.07111111111111111,
+          "filename": "frame_48.0s.jpg",
+          "path": "temp_frames/frame_48.0s.jpg",
+          "score": 150.47851827798524,
+          "should_include": true,
+          "timestamp": 48
+        },
+        {
+          "face_ratio": 0.07111111111111111,
+          "filename": "frame_48.9s.jpg",
+          "path": "temp_frames/frame_48.9s.jpg",
+          "score": 123.33036527306604,
+          "should_include": true,
+          "timestamp": 48.88
+        },
+        {
+          "face_ratio": 0.07111111111111111,
+          "filename": "frame_49.0s.jpg",
+          "path": "temp_frames/frame_49.0s.jpg",
+          "score": 166.77835106753673,
+          "should_include": true,
+          "timestamp": 49
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_50.0s.jpg",
+          "path": "temp_frames/frame_50.0s.jpg",
+          "score": 889.2,
+          "should_include": true,
+          "timestamp": 50
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_51.9s.jpg",
+          "path": "temp_frames/frame_51.9s.jpg",
+          "score": 772.4190513357612,
+          "should_include": true,
+          "timestamp": 51.88
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_52.0s.jpg",
+          "path": "temp_frames/frame_52.0s.jpg",
+          "score": 748.3442950953818,
+          "should_include": true,
+          "timestamp": 52
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_53.0s.jpg",
+          "path": "temp_frames/frame_53.0s.jpg",
+          "score": 834.8546056375449,
+          "should_include": true,
+          "timestamp": 53
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_54.0s.jpg",
+          "path": "temp_frames/frame_54.0s.jpg",
+          "score": 1017.6034157229099,
+          "should_include": true,
+          "timestamp": 54
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_55.0s.jpg",
+          "path": "temp_frames/frame_55.0s.jpg",
+          "score": 1029.4269002928036,
+          "should_include": true,
+          "timestamp": 55
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_56.3s.jpg",
+          "path": "temp_frames/frame_56.3s.jpg",
+          "score": 812.6645558938994,
+          "should_include": true,
+          "timestamp": 56.28
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_57.0s.jpg",
+          "path": "temp_frames/frame_57.0s.jpg",
+          "score": 800.1288540336752,
+          "should_include": true,
+          "timestamp": 57
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_58.0s.jpg",
+          "path": "temp_frames/frame_58.0s.jpg",
+          "score": 788.0097313783965,
+          "should_include": true,
+          "timestamp": 58
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_59.0s.jpg",
+          "path": "temp_frames/frame_59.0s.jpg",
+          "score": 318.2,
+          "should_include": true,
+          "timestamp": 59
+        },
+        {
+          "face_ratio": 0.07111111111111111,
+          "filename": "frame_60.0s.jpg",
+          "path": "temp_frames/frame_60.0s.jpg",
+          "score": 160.41796826992436,
+          "should_include": true,
+          "timestamp": 60
+        },
+        {
+          "face_ratio": 0.06781684027777778,
+          "filename": "frame_61.0s.jpg",
+          "path": "temp_frames/frame_61.0s.jpg",
+          "score": 98.00585652430027,
+          "should_include": true,
+          "timestamp": 61
+        },
+        {
+          "face_ratio": 0.06781684027777778,
+          "filename": "frame_61.5s.jpg",
+          "path": "temp_frames/frame_61.5s.jpg",
+          "score": 152.69083726552662,
+          "should_include": true,
+          "timestamp": 61.48
+        }
+      ],
+      "selected_frames": [
+        "temp_frames/frame_55.0s.jpg"
+      ]
+    },
+    {
+      "title": "Choosing a Coordinator",
+      "start_time": 61.5,
+      "end_time": 100.1,
+      "available_frames": [
+        {
+          "face_ratio": 0.07448350694444444,
+          "filename": "frame_63.0s.jpg",
+          "path": "temp_frames/frame_63.0s.jpg",
+          "score": 64.06030949988735,
+          "should_include": true,
+          "timestamp": 63
+        },
+        {
+          "face_ratio": 0.06673611111111111,
+          "filename": "frame_64.0s.jpg",
+          "path": "temp_frames/frame_64.0s.jpg",
+          "score": 157.70420876712637,
+          "should_include": true,
+          "timestamp": 64
+        },
+        {
+          "face_ratio": 0.075625,
+          "filename": "frame_66.0s.jpg",
+          "path": "temp_frames/frame_66.0s.jpg",
+          "score": 165.42745953811493,
+          "should_include": true,
+          "timestamp": 66
+        },
+        {
+          "face_ratio": 0.075625,
+          "filename": "frame_66.4s.jpg",
+          "path": "temp_frames/frame_66.4s.jpg",
+          "score": 181.43754954183794,
+          "should_include": true,
+          "timestamp": 66.4
+        },
+        {
+          "face_ratio": 0.07000434027777777,
+          "filename": "frame_67.0s.jpg",
+          "path": "temp_frames/frame_67.0s.jpg",
+          "score": 132.10217536198627,
+          "should_include": true,
+          "timestamp": 67
+        },
+        {
+          "face_ratio": 0.06781684027777778,
+          "filename": "frame_68.0s.jpg",
+          "path": "temp_frames/frame_68.0s.jpg",
+          "score": 106.01766926662879,
+          "should_include": true,
+          "timestamp": 68
+        },
+        {
+          "face_ratio": 0.06781684027777778,
+          "filename": "frame_70.0s.jpg",
+          "path": "temp_frames/frame_70.0s.jpg",
+          "score": 133.29122480415185,
+          "should_include": true,
+          "timestamp": 70
+        },
+        {
+          "face_ratio": 0.05740017361111111,
+          "filename": "frame_71.0s.jpg",
+          "path": "temp_frames/frame_71.0s.jpg",
+          "score": 132.6791199697244,
+          "should_include": true,
+          "timestamp": 71
+        },
+        {
+          "face_ratio": 0.08385850694444444,
+          "filename": "frame_72.5s.jpg",
+          "path": "temp_frames/frame_72.5s.jpg",
+          "score": 112.35197655311049,
+          "should_include": true,
+          "timestamp": 72.52
+        },
+        {
+          "face_ratio": 0.07448350694444444,
+          "filename": "frame_73.0s.jpg",
+          "path": "temp_frames/frame_73.0s.jpg",
+          "score": 155.47174255505013,
+          "should_include": true,
+          "timestamp": 73
+        },
+        {
+          "face_ratio": 0.07111111111111111,
+          "filename": "frame_74.0s.jpg",
+          "path": "temp_frames/frame_74.0s.jpg",
+          "score": 130.1442722885697,
+          "should_include": true,
+          "timestamp": 74
+        },
+        {
+          "face_ratio": 0.07335069444444445,
+          "filename": "frame_76.0s.jpg",
+          "path": "temp_frames/frame_76.0s.jpg",
+          "score": 129.37352588861927,
+          "should_include": true,
+          "timestamp": 76
+        },
+        {
+          "face_ratio": 0.0722265625,
+          "filename": "frame_77.4s.jpg",
+          "path": "temp_frames/frame_77.4s.jpg",
+          "score": 161.53744990935309,
+          "should_include": true,
+          "timestamp": 77.36
+        },
+        {
+          "face_ratio": 0.06890625,
+          "filename": "frame_78.0s.jpg",
+          "path": "temp_frames/frame_78.0s.jpg",
+          "score": 128.8508978690611,
+          "should_include": true,
+          "timestamp": 78
+        },
+        {
+          "face_ratio": 0.06781684027777778,
+          "filename": "frame_79.0s.jpg",
+          "path": "temp_frames/frame_79.0s.jpg",
+          "score": 137.9622409043278,
+          "should_include": true,
+          "timestamp": 79
+        },
+        {
+          "face_ratio": 0.07000434027777777,
+          "filename": "frame_80.0s.jpg",
+          "path": "temp_frames/frame_80.0s.jpg",
+          "score": 157.8112994539846,
+          "should_include": true,
+          "timestamp": 80
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_82.0s.jpg",
+          "path": "temp_frames/frame_82.0s.jpg",
+          "score": 973.2,
+          "should_include": true,
+          "timestamp": 82
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_84.0s.jpg",
+          "path": "temp_frames/frame_84.0s.jpg",
+          "score": 865.4851166322776,
+          "should_include": true,
+          "timestamp": 84
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_85.0s.jpg",
+          "path": "temp_frames/frame_85.0s.jpg",
+          "score": 864.7467802339713,
+          "should_include": true,
+          "timestamp": 85
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_87.0s.jpg",
+          "path": "temp_frames/frame_87.0s.jpg",
+          "score": 864.8670473982746,
+          "should_include": true,
+          "timestamp": 87
+        },
+        {
+          "face_ratio": 0.06146267361111111,
+          "filename": "frame_89.0s.jpg",
+          "path": "temp_frames/frame_89.0s.jpg",
+          "score": 228.20000000000005,
+          "should_include": true,
+          "timestamp": 89
+        },
+        {
+          "face_ratio": 0.06781684027777778,
+          "filename": "frame_90.0s.jpg",
+          "path": "temp_frames/frame_90.0s.jpg",
+          "score": 68.56993053707572,
+          "should_include": true,
+          "timestamp": 90
+        },
+        {
+          "face_ratio": 0.06781684027777778,
+          "filename": "frame_90.3s.jpg",
+          "path": "temp_frames/frame_90.3s.jpg",
+          "score": 102.01764799528291,
+          "should_include": true,
+          "timestamp": 90.34
+        },
+        {
+          "face_ratio": 0.06146267361111111,
+          "filename": "frame_92.0s.jpg",
+          "path": "temp_frames/frame_92.0s.jpg",
+          "score": 68.56582760572417,
+          "should_include": true,
+          "timestamp": 92
+        },
+        {
+          "face_ratio": 0.07111111111111111,
+          "filename": "frame_93.0s.jpg",
+          "path": "temp_frames/frame_93.0s.jpg",
+          "score": 101.70155083924487,
+          "should_include": true,
+          "timestamp": 93
+        },
+        {
+          "face_ratio": 0.058402777777777776,
+          "filename": "frame_95.0s.jpg",
+          "path": "temp_frames/frame_95.0s.jpg",
+          "score": 142.90272468509454,
+          "should_include": true,
+          "timestamp": 95
+        },
+        {
+          "face_ratio": 0.075625,
+          "filename": "frame_97.0s.jpg",
+          "path": "temp_frames/frame_97.0s.jpg",
+          "score": 116.96911586007752,
+          "should_include": true,
+          "timestamp": 97
+        },
+        {
+          "face_ratio": 0.07000434027777777,
+          "filename": "frame_98.0s.jpg",
+          "path": "temp_frames/frame_98.0s.jpg",
+          "score": 104.70887185942138,
+          "should_include": true,
+          "timestamp": 98
+        },
+        {
+          "face_ratio": 0.07111111111111111,
+          "filename": "frame_99.0s.jpg",
+          "path": "temp_frames/frame_99.0s.jpg",
+          "score": 126.1781052725155,
+          "should_include": true,
+          "timestamp": 99
+        },
+        {
+          "face_ratio": 0.07000434027777777,
+          "filename": "frame_100.0s.jpg",
+          "path": "temp_frames/frame_100.0s.jpg",
+          "score": 147.3920494426112,
+          "should_include": true,
+          "timestamp": 100
+        }
+      ],
+      "selected_frames": [
+        "temp_frames/frame_87.0s.jpg"
+      ]
+    },
+    {
+      "title": "Coordinator Placement and USB Interference",
+      "start_time": 100.1,
+      "end_time": 182.3,
+      "available_frames": [
+        {
+          "face_ratio": 0.06781684027777778,
+          "filename": "frame_102.0s.jpg",
+          "path": "temp_frames/frame_102.0s.jpg",
+          "score": 155.60987374231252,
+          "should_include": true,
+          "timestamp": 102
+        },
+        {
+          "face_ratio": 0.07111111111111111,
+          "filename": "frame_103.0s.jpg",
+          "path": "temp_frames/frame_103.0s.jpg",
+          "score": 97.61510683988035,
+          "should_include": true,
+          "timestamp": 103
+        },
+        {
+          "face_ratio": 0.0722265625,
+          "filename": "frame_105.0s.jpg",
+          "path": "temp_frames/frame_105.0s.jpg",
+          "score": 140.20416143064585,
+          "should_include": true,
+          "timestamp": 105
+        },
+        {
+          "face_ratio": 0.06781684027777778,
+          "filename": "frame_107.0s.jpg",
+          "path": "temp_frames/frame_107.0s.jpg",
+          "score": 154.41494906404387,
+          "should_include": true,
+          "timestamp": 107
+        },
+        {
+          "face_ratio": 0.07677517361111111,
+          "filename": "frame_110.0s.jpg",
+          "path": "temp_frames/frame_110.0s.jpg",
+          "score": 93.95669919445709,
+          "should_include": true,
+          "timestamp": 110
+        },
+        {
+          "face_ratio": 0.0722265625,
+          "filename": "frame_112.0s.jpg",
+          "path": "temp_frames/frame_112.0s.jpg",
+          "score": 57.77107194600046,
+          "should_include": true,
+          "timestamp": 112
+        },
+        {
+          "face_ratio": 0.06781684027777778,
+          "filename": "frame_113.0s.jpg",
+          "path": "temp_frames/frame_113.0s.jpg",
+          "score": 162.0347591144149,
+          "should_include": true,
+          "timestamp": 113
+        },
+        {
+          "face_ratio": 0.06146267361111111,
+          "filename": "frame_114.0s.jpg",
+          "path": "temp_frames/frame_114.0s.jpg",
+          "score": 160.87599440021302,
+          "should_include": true,
+          "timestamp": 114
+        },
+        {
+          "face_ratio": 0.06146267361111111,
+          "filename": "frame_115.0s.jpg",
+          "path": "temp_frames/frame_115.0s.jpg",
+          "score": 131.0237898995132,
+          "should_include": true,
+          "timestamp": 115
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_117.0s.jpg",
+          "path": "temp_frames/frame_117.0s.jpg",
+          "score": 1071.5233562615288,
+          "should_include": true,
+          "timestamp": 117
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_117.9s.jpg",
+          "path": "temp_frames/frame_117.9s.jpg",
+          "score": 1017.8112310626123,
+          "should_include": true,
+          "timestamp": 117.88
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_119.0s.jpg",
+          "path": "temp_frames/frame_119.0s.jpg",
+          "score": 1179.2271323604277,
+          "should_include": true,
+          "timestamp": 119
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_120.0s.jpg",
+          "path": "temp_frames/frame_120.0s.jpg",
+          "score": 878.114315201512,
+          "should_include": true,
+          "timestamp": 120
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_122.4s.jpg",
+          "path": "temp_frames/frame_122.4s.jpg",
+          "score": 888.1243713349345,
+          "should_include": true,
+          "timestamp": 122.38
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_126.0s.jpg",
+          "path": "temp_frames/frame_126.0s.jpg",
+          "score": 901.6897765123431,
+          "should_include": true,
+          "timestamp": 126
+        },
+        {
+          "face_ratio": 0.06673611111111111,
+          "filename": "frame_136.0s.jpg",
+          "path": "temp_frames/frame_136.0s.jpg",
+          "score": 176.3058428882947,
+          "should_include": true,
+          "timestamp": 136
+        },
+        {
+          "face_ratio": 0.0722265625,
+          "filename": "frame_148.7s.jpg",
+          "path": "temp_frames/frame_148.7s.jpg",
+          "score": 49.50735770092899,
+          "should_include": true,
+          "timestamp": 148.7
+        },
+        {
+          "face_ratio": 0.08265625,
+          "filename": "frame_156.3s.jpg",
+          "path": "temp_frames/frame_156.3s.jpg",
+          "score": 159.73925457992766,
+          "should_include": true,
+          "timestamp": 156.34
+        },
+        {
+          "face_ratio": 0.0656640625,
+          "filename": "frame_160.0s.jpg",
+          "path": "temp_frames/frame_160.0s.jpg",
+          "score": 114.38855261082904,
+          "should_include": true,
+          "timestamp": 160
+        },
+        {
+          "face_ratio": 0.06460069444444444,
+          "filename": "frame_161.9s.jpg",
+          "path": "temp_frames/frame_161.9s.jpg",
+          "score": 133.9894373149109,
+          "should_include": true,
+          "timestamp": 161.86
+        },
+        {
+          "face_ratio": 0.06673611111111111,
+          "filename": "frame_165.0s.jpg",
+          "path": "temp_frames/frame_165.0s.jpg",
+          "score": 144.9248870299068,
+          "should_include": true,
+          "timestamp": 165
+        },
+        {
+          "face_ratio": 0.06460069444444444,
+          "filename": "frame_167.0s.jpg",
+          "path": "temp_frames/frame_167.0s.jpg",
+          "score": 131.2445389266618,
+          "should_include": true,
+          "timestamp": 166.98
+        },
+        {
+          "face_ratio": 0.0722265625,
+          "filename": "frame_172.5s.jpg",
+          "path": "temp_frames/frame_172.5s.jpg",
+          "score": 136.78844223521685,
+          "should_include": true,
+          "timestamp": 172.46
+        },
+        {
+          "face_ratio": 0.06673611111111111,
+          "filename": "frame_175.0s.jpg",
+          "path": "temp_frames/frame_175.0s.jpg",
+          "score": 167.52964188390274,
+          "should_include": true,
+          "timestamp": 175
+        },
+        {
+          "face_ratio": 0.0625,
+          "filename": "frame_177.4s.jpg",
+          "path": "temp_frames/frame_177.4s.jpg",
+          "score": 162.19658107539362,
+          "should_include": true,
+          "timestamp": 177.36
+        },
+        {
+          "face_ratio": 0.06781684027777778,
+          "filename": "frame_181.0s.jpg",
+          "path": "temp_frames/frame_181.0s.jpg",
+          "score": 162.70213957881208,
+          "should_include": true,
+          "timestamp": 181
+        }
+      ],
+      "selected_frames": [
+        "temp_frames/frame_126.0s.jpg"
+      ]
+    },
+    {
+      "title": "Device Limits and Mesh Network Goals",
+      "start_time": 182.3,
+      "end_time": 212.9,
+      "available_frames": [
+        {
+          "face_ratio": 0,
+          "filename": "frame_190.2s.jpg",
+          "path": "temp_frames/frame_190.2s.jpg",
+          "score": 908.2,
+          "should_include": true,
+          "timestamp": 190.24
+        },
+        {
+          "face_ratio": 0.075625,
+          "filename": "frame_194.0s.jpg",
+          "path": "temp_frames/frame_194.0s.jpg",
+          "score": 158.20000000000005,
+          "should_include": true,
+          "timestamp": 194.04
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_202.4s.jpg",
+          "path": "temp_frames/frame_202.4s.jpg",
+          "score": 839.2,
+          "should_include": true,
+          "timestamp": 202.44
+        },
+        {
+          "face_ratio": 0.07793402777777778,
+          "filename": "frame_208.8s.jpg",
+          "path": "temp_frames/frame_208.8s.jpg",
+          "score": 93.20000000000005,
+          "should_include": true,
+          "timestamp": 208.84
+        },
+        {
+          "face_ratio": 0.0594140625,
+          "filename": "frame_212.9s.jpg",
+          "path": "temp_frames/frame_212.9s.jpg",
+          "score": 58.40842851911202,
+          "should_include": true,
+          "timestamp": 212.88
+        }
+      ],
+      "selected_frames": [
+        "temp_frames/frame_190.2s.jpg",
+        "temp_frames/frame_202.4s.jpg"
+      ]
+    },
+    {
+      "title": "Channel Selection: Avoiding Interference",
+      "start_time": 212.9,
+      "end_time": 255.6,
+      "available_frames": [
+        {
+          "face_ratio": 0,
+          "filename": "frame_225.0s.jpg",
+          "path": "temp_frames/frame_225.0s.jpg",
+          "score": 1003.2,
+          "should_include": true,
+          "timestamp": 225
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_229.2s.jpg",
+          "path": "temp_frames/frame_229.2s.jpg",
+          "score": 1133.4,
+          "should_include": true,
+          "timestamp": 229.24
+        },
+        {
+          "face_ratio": 0.06890625,
+          "filename": "frame_235.8s.jpg",
+          "path": "temp_frames/frame_235.8s.jpg",
+          "score": 53.200000000000045,
+          "should_include": true,
+          "timestamp": 235.76
+        },
+        {
+          "face_ratio": 0.0722265625,
+          "filename": "frame_251.1s.jpg",
+          "path": "temp_frames/frame_251.1s.jpg",
+          "score": 95.57744495233283,
+          "should_include": true,
+          "timestamp": 251.08
+        }
+      ],
+      "selected_frames": [
+        "temp_frames/frame_225.0s.jpg",
+        "temp_frames/frame_229.2s.jpg"
+      ]
+    },
+    {
+      "title": "Understanding Device Types: Routers vs. End Devices",
+      "start_time": 255.6,
+      "end_time": 273.1,
+      "available_frames": [
+        {
+          "face_ratio": 0,
+          "filename": "frame_260.0s.jpg",
+          "path": "temp_frames/frame_260.0s.jpg",
+          "score": 495.2161864218986,
+          "should_include": true,
+          "timestamp": 260
+        },
+        {
+          "face_ratio": 0.058402777777777776,
+          "filename": "frame_266.0s.jpg",
+          "path": "temp_frames/frame_266.0s.jpg",
+          "score": 118.12944817916275,
+          "should_include": true,
+          "timestamp": 266
+        },
+        {
+          "face_ratio": 0.0722265625,
+          "filename": "frame_267.5s.jpg",
+          "path": "temp_frames/frame_267.5s.jpg",
+          "score": 95.34873068381944,
+          "should_include": true,
+          "timestamp": 267.52
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_270.0s.jpg",
+          "path": "temp_frames/frame_270.0s.jpg",
+          "score": 482.78846178286307,
+          "should_include": true,
+          "timestamp": 270
+        }
+      ],
+      "selected_frames": [
+        "temp_frames/frame_260.0s.jpg",
+        "temp_frames/frame_270.0s.jpg"
+      ]
+    },
+    {
+      "title": "Routers",
+      "start_time": 273.1,
+      "end_time": 300.9,
+      "available_frames": [
+        {
+          "face_ratio": 0.10027777777777777,
+          "filename": "frame_277.8s.jpg",
+          "path": "temp_frames/frame_277.8s.jpg",
+          "score": 39.39025699800595,
+          "should_include": true,
+          "timestamp": 277.82
+        },
+        {
+          "face_ratio": 0.09251736111111111,
+          "filename": "frame_283.7s.jpg",
+          "path": "temp_frames/frame_283.7s.jpg",
+          "score": 77.40165138147825,
+          "should_include": true,
+          "timestamp": 283.74
+        },
+        {
+          "face_ratio": 0.07000434027777777,
+          "filename": "frame_291.0s.jpg",
+          "path": "temp_frames/frame_291.0s.jpg",
+          "score": 68.07731841939642,
+          "should_include": true,
+          "timestamp": 290.96
+        }
+      ],
+      "selected_frames": []
+    },
+    {
+      "title": "End Devices",
+      "start_time": 300.9,
+      "end_time": 339,
+      "available_frames": [
+        {
+          "face_ratio": 0.075625,
+          "filename": "frame_301.0s.jpg",
+          "path": "temp_frames/frame_301.0s.jpg",
+          "score": 76.57970833475997,
+          "should_include": true,
+          "timestamp": 301
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_311.0s.jpg",
+          "path": "temp_frames/frame_311.0s.jpg",
+          "score": 814.2,
+          "should_include": true,
+          "timestamp": 311
+        },
+        {
+          "face_ratio": 0.06673611111111111,
+          "filename": "frame_316.0s.jpg",
+          "path": "temp_frames/frame_316.0s.jpg",
+          "score": 173.20000000000005,
+          "should_include": true,
+          "timestamp": 316
+        },
+        {
+          "face_ratio": 0.06890625,
+          "filename": "frame_329.2s.jpg",
+          "path": "temp_frames/frame_329.2s.jpg",
+          "score": 131.2816399906958,
+          "should_include": true,
+          "timestamp": 329.16
+        },
+        {
+          "face_ratio": 0.0722265625,
+          "filename": "frame_330.0s.jpg",
+          "path": "temp_frames/frame_330.0s.jpg",
+          "score": 123.96943501804708,
+          "should_include": true,
+          "timestamp": 330
+        },
+        {
+          "face_ratio": 0.08265625,
+          "filename": "frame_333.8s.jpg",
+          "path": "temp_frames/frame_333.8s.jpg",
+          "score": 45.35249694872664,
+          "should_include": true,
+          "timestamp": 333.8
+        }
+      ],
+      "selected_frames": [
+        "temp_frames/frame_311.0s.jpg"
+      ]
+    },
+    {
+      "title": "Mesh Network Dynamics and Patience",
+      "start_time": 339,
+      "end_time": 371.8,
+      "available_frames": [
+        {
+          "face_ratio": 0.07677517361111111,
+          "filename": "frame_339.0s.jpg",
+          "path": "temp_frames/frame_339.0s.jpg",
+          "score": 85.97223840693789,
+          "should_include": true,
+          "timestamp": 339.04
+        },
+        {
+          "face_ratio": 0.06673611111111111,
+          "filename": "frame_350.0s.jpg",
+          "path": "temp_frames/frame_350.0s.jpg",
+          "score": 36.580224556998814,
+          "should_include": true,
+          "timestamp": 350
+        },
+        {
+          "face_ratio": 0.0862890625,
+          "filename": "frame_360.0s.jpg",
+          "path": "temp_frames/frame_360.0s.jpg",
+          "score": 86.61931061012876,
+          "should_include": true,
+          "timestamp": 360
+        }
+      ],
+      "selected_frames": []
+    },
+    {
+      "title": "\"Sticky\" Devices and Pairing Strategies",
+      "start_time": 371.8,
+      "end_time": 413.4,
+      "available_frames": [
+        {
+          "face_ratio": 0.0594140625,
+          "filename": "frame_372.8s.jpg",
+          "path": "temp_frames/frame_372.8s.jpg",
+          "score": 104.00249995239028,
+          "should_include": true,
+          "timestamp": 372.84000000000003
+        },
+        {
+          "face_ratio": 0.0594140625,
+          "filename": "frame_375.0s.jpg",
+          "path": "temp_frames/frame_375.0s.jpg",
+          "score": 62.424963277312145,
+          "should_include": true,
+          "timestamp": 375
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_395.0s.jpg",
+          "path": "temp_frames/frame_395.0s.jpg",
+          "score": 978.2,
+          "should_include": true,
+          "timestamp": 395
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_398.0s.jpg",
+          "path": "temp_frames/frame_398.0s.jpg",
+          "score": 942.0836806835653,
+          "should_include": true,
+          "timestamp": 398
+        },
+        {
+          "face_ratio": 0.06781684027777778,
+          "filename": "frame_401.0s.jpg",
+          "path": "temp_frames/frame_401.0s.jpg",
+          "score": 158.20000000000005,
+          "should_include": true,
+          "timestamp": 401
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_403.2s.jpg",
+          "path": "temp_frames/frame_403.2s.jpg",
+          "score": 1079.2,
+          "should_include": true,
+          "timestamp": 403.16
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_405.0s.jpg",
+          "path": "temp_frames/frame_405.0s.jpg",
+          "score": 896.5957480636755,
+          "should_include": true,
+          "timestamp": 405
+        }
+      ],
+      "selected_frames": [
+        "temp_frames/frame_405.0s.jpg",
+        "temp_frames/frame_398.0s.jpg"
+      ]
+    },
+    {
+      "title": "Advanced Troubleshooting: Leveraging Log Files",
+      "start_time": 413.4,
+      "end_time": 430.5,
+      "available_frames": [
+        {
+          "face_ratio": 0.06890625,
+          "filename": "frame_414.4s.jpg",
+          "path": "temp_frames/frame_414.4s.jpg",
+          "score": 128.20000000000005,
+          "should_include": true,
+          "timestamp": 414.44
+        },
+        {
+          "face_ratio": 0.06781684027777778,
+          "filename": "frame_419.9s.jpg",
+          "path": "temp_frames/frame_419.9s.jpg",
+          "score": 54.718092131055414,
+          "should_include": true,
+          "timestamp": 419.88
+        },
+        {
+          "face_ratio": 0.0656640625,
+          "filename": "frame_425.6s.jpg",
+          "path": "temp_frames/frame_425.6s.jpg",
+          "score": 67.14022756339978,
+          "should_include": true,
+          "timestamp": 425.64
+        },
+        {
+          "face_ratio": 0.0534765625,
+          "filename": "frame_430.0s.jpg",
+          "path": "temp_frames/frame_430.0s.jpg",
+          "score": 908.2,
+          "should_include": true,
+          "timestamp": 430
+        }
+      ],
+      "selected_frames": [
+        "temp_frames/frame_430.0s.jpg"
+      ]
+    },
+    {
+      "title": "Analyzing Log Data",
+      "start_time": 430.5,
+      "end_time": 523.5,
+      "available_frames": [
+        {
+          "face_ratio": 0,
+          "filename": "frame_436.0s.jpg",
+          "path": "temp_frames/frame_436.0s.jpg",
+          "score": 292.3245399605329,
+          "should_include": true,
+          "timestamp": 436
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_440.0s.jpg",
+          "path": "temp_frames/frame_440.0s.jpg",
+          "score": 1175.881570934907,
+          "should_include": true,
+          "timestamp": 440
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_450.3s.jpg",
+          "path": "temp_frames/frame_450.3s.jpg",
+          "score": 1135.4867790050712,
+          "should_include": true,
+          "timestamp": 450.3
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_454.5s.jpg",
+          "path": "temp_frames/frame_454.5s.jpg",
+          "score": 860.0613775873762,
+          "should_include": true,
+          "timestamp": 454.52
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_460.0s.jpg",
+          "path": "temp_frames/frame_460.0s.jpg",
+          "score": 1137.843530009144,
+          "should_include": true,
+          "timestamp": 460
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_465.0s.jpg",
+          "path": "temp_frames/frame_465.0s.jpg",
+          "score": 861.3528271439709,
+          "should_include": true,
+          "timestamp": 465
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_476.0s.jpg",
+          "path": "temp_frames/frame_476.0s.jpg",
+          "score": 826.7964798462651,
+          "should_include": true,
+          "timestamp": 476
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_480.0s.jpg",
+          "path": "temp_frames/frame_480.0s.jpg",
+          "score": 1117.0463966656698,
+          "should_include": true,
+          "timestamp": 480
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_486.0s.jpg",
+          "path": "temp_frames/frame_486.0s.jpg",
+          "score": 1111.554419778161,
+          "should_include": true,
+          "timestamp": 486
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_486.6s.jpg",
+          "path": "temp_frames/frame_486.6s.jpg",
+          "score": 955.1848652817466,
+          "should_include": true,
+          "timestamp": 486.62
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_492.4s.jpg",
+          "path": "temp_frames/frame_492.4s.jpg",
+          "score": 182.43016139257907,
+          "should_include": true,
+          "timestamp": 492.36
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_500.4s.jpg",
+          "path": "temp_frames/frame_500.4s.jpg",
+          "score": 1054.5030602295274,
+          "should_include": true,
+          "timestamp": 500.38
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_505.0s.jpg",
+          "path": "temp_frames/frame_505.0s.jpg",
+          "score": 1084.3589986773463,
+          "should_include": true,
+          "timestamp": 505
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_511.0s.jpg",
+          "path": "temp_frames/frame_511.0s.jpg",
+          "score": 1146.2086082418464,
+          "should_include": true,
+          "timestamp": 511
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_516.0s.jpg",
+          "path": "temp_frames/frame_516.0s.jpg",
+          "score": 1091.8742452784863,
+          "should_include": true,
+          "timestamp": 516
+        },
+        {
+          "face_ratio": 0.038350694444444444,
+          "filename": "frame_517.5s.jpg",
+          "path": "temp_frames/frame_517.5s.jpg",
+          "score": 921.0635326595815,
+          "should_include": true,
+          "timestamp": 517.54
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_520.0s.jpg",
+          "path": "temp_frames/frame_520.0s.jpg",
+          "score": 279.9059677689413,
+          "should_include": true,
+          "timestamp": 520
+        },
+        {
+          "face_ratio": 0.0425390625,
+          "filename": "frame_523.5s.jpg",
+          "path": "temp_frames/frame_523.5s.jpg",
+          "score": 271.52794977141434,
+          "should_include": true,
+          "timestamp": 523.46
+        }
+      ],
+      "selected_frames": [
+        "temp_frames/frame_436.0s.jpg",
+        "temp_frames/frame_460.0s.jpg",
+        "temp_frames/frame_517.5s.jpg"
+      ]
+    },
+    {
+      "title": "Automating Log Analysis with AI",
+      "start_time": 523.5,
+      "end_time": 634.3,
+      "available_frames": [
+        {
+          "face_ratio": 0,
+          "filename": "frame_526.0s.jpg",
+          "path": "temp_frames/frame_526.0s.jpg",
+          "score": 301.4354446537483,
+          "should_include": true,
+          "timestamp": 526
+        },
+        {
+          "face_ratio": 0.03515625,
+          "filename": "frame_536.0s.jpg",
+          "path": "temp_frames/frame_536.0s.jpg",
+          "score": 276.9829950902864,
+          "should_include": true,
+          "timestamp": 536
+        },
+        {
+          "face_ratio": 0.0534765625,
+          "filename": "frame_536.8s.jpg",
+          "path": "temp_frames/frame_536.8s.jpg",
+          "score": 364.1056277450349,
+          "should_include": true,
+          "timestamp": 536.84
+        },
+        {
+          "face_ratio": 0.035941840277777776,
+          "filename": "frame_544.6s.jpg",
+          "path": "temp_frames/frame_544.6s.jpg",
+          "score": 189.64964369202335,
+          "should_include": true,
+          "timestamp": 544.6
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_551.0s.jpg",
+          "path": "temp_frames/frame_551.0s.jpg",
+          "score": 217.9352797438395,
+          "should_include": true,
+          "timestamp": 551
+        },
+        {
+          "face_ratio": 0.0328515625,
+          "filename": "frame_555.0s.jpg",
+          "path": "temp_frames/frame_555.0s.jpg",
+          "score": 280.3383930847132,
+          "should_include": true,
+          "timestamp": 555
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_557.9s.jpg",
+          "path": "temp_frames/frame_557.9s.jpg",
+          "score": 1312.224233039301,
+          "should_include": true,
+          "timestamp": 557.86
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_561.0s.jpg",
+          "path": "temp_frames/frame_561.0s.jpg",
+          "score": 1281.7933100271043,
+          "should_include": true,
+          "timestamp": 561
+        },
+        {
+          "face_ratio": 0.04969184027777778,
+          "filename": "frame_569.7s.jpg",
+          "path": "temp_frames/frame_569.7s.jpg",
+          "score": 391.16849132104517,
+          "should_include": true,
+          "timestamp": 569.72
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_576.0s.jpg",
+          "path": "temp_frames/frame_576.0s.jpg",
+          "score": 357.50026632669585,
+          "should_include": true,
+          "timestamp": 576
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_577.1s.jpg",
+          "path": "temp_frames/frame_577.1s.jpg",
+          "score": 479.67087387820084,
+          "should_include": true,
+          "timestamp": 577.1400000000001
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_585.5s.jpg",
+          "path": "temp_frames/frame_585.5s.jpg",
+          "score": 211.58662769771695,
+          "should_include": true,
+          "timestamp": 585.5
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_590.0s.jpg",
+          "path": "temp_frames/frame_590.0s.jpg",
+          "score": 280.9601693478852,
+          "should_include": true,
+          "timestamp": 590
+        },
+        {
+          "face_ratio": 0,
+          "filename": "frame_626.0s.jpg",
+          "path": "temp_frames/frame_626.0s.jpg",
+          "score": 612.048696622333,
+          "should_include": true,
+          "timestamp": 626
+        },
+        {
+          "face_ratio": 0.0478515625,
+          "filename": "frame_634.3s.jpg",
+          "path": "temp_frames/frame_634.3s.jpg",
+          "score": 847.4010501324863,
+          "should_include": true,
+          "timestamp": 634.26
+        }
+      ],
+      "selected_frames": [
+        "temp_frames/frame_569.7s.jpg",
+        "temp_frames/frame_634.3s.jpg",
+        "temp_frames/frame_590.0s.jpg"
+      ]
+    },
+    {
+      "title": "Conclusion",
+      "start_time": 634.3,
+      "end_time": null,
+      "available_frames": [
+        {
+          "face_ratio": 0.0722265625,
+          "filename": "frame_641.0s.jpg",
+          "path": "temp_frames/frame_641.0s.jpg",
+          "score": 138.20000000000005,
+          "should_include": true,
+          "timestamp": 641
+        },
+        {
+          "face_ratio": 0.0814626736111111,
+          "filename": "frame_642.2s.jpg",
+          "path": "temp_frames/frame_642.2s.jpg",
+          "score": 142.03775201157453,
+          "should_include": true,
+          "timestamp": 642.2
+        },
+        {
+          "face_ratio": 0.0656640625,
+          "filename": "frame_667.0s.jpg",
+          "path": "temp_frames/frame_667.0s.jpg",
+          "score": 95.24117482450026,
+          "should_include": true,
+          "timestamp": 667.02
+        },
+        {
+          "face_ratio": 0.0625,
+          "filename": "frame_671.0s.jpg",
+          "path": "temp_frames/frame_671.0s.jpg",
+          "score": 102.74910397229019,
+          "should_include": true,
+          "timestamp": 671
+        },
+        {
+          "face_ratio": 0.07793402777777778,
+          "filename": "frame_673.0s.jpg",
+          "path": "temp_frames/frame_673.0s.jpg",
+          "score": 170.17012169165332,
+          "should_include": true,
+          "timestamp": 672.98
+        },
+        {
+          "face_ratio": 0.08265625,
+          "filename": "frame_680.8s.jpg",
+          "path": "temp_frames/frame_680.8s.jpg",
+          "score": 52.43240026135754,
+          "should_include": true,
+          "timestamp": 680.84
+        },
+        {
+          "face_ratio": 0.07448350694444444,
+          "filename": "frame_687.7s.jpg",
+          "path": "temp_frames/frame_687.7s.jpg",
+          "score": 42.60437783154532,
+          "should_include": true,
+          "timestamp": 687.66
+        }
+      ],
+      "selected_frames": []
+    }
+  ]
+}

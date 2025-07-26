@@ -334,6 +334,10 @@ class SemanticFrameScorer:
             score += 20
         if contrast > 30:
             score += 25
+        
+        # Training-derived brightness preference: bonus for bright frames
+        if brightness > 160:
+            score += 10
             
         return min(score, 100)
     
@@ -417,6 +421,10 @@ class SemanticFrameScorer:
                 score += 35
         
         return min(score, 100)
+    
+    def calculate_semantic_score(self, frame_path: str, section: Dict) -> float:
+        """Calculate semantic score for a frame relative to a section (alias for score_frame_for_section)."""
+        return self.score_frame_for_section(frame_path, section)
     
     def _detect_ha_colors(self, frame: np.ndarray) -> bool:
         """Detect Home Assistant's characteristic orange/blue color scheme."""
@@ -545,6 +553,68 @@ class SemanticFrameSelector:
         final_frames = self._deduplicate_and_filter_frames(diversity_filtered_frames)
         
         logger.info(f"✅ Semantic selection complete: {len(final_frames)} frames selected")
+        return final_frames
+    
+    def select_frames_from_blog_content(
+        self,
+        video_path: str,
+        transcript_segments: List[Dict],
+        formatted_blog_content: str,
+        temp_dir: str,
+        video_title: str = None,
+        blog_formatter = None
+    ) -> List[Dict]:
+        """Select frames using semantic analysis of formatted blog content instead of raw transcript."""
+        
+        logger.info("🧠 Starting semantic frame selection from formatted blog content...")
+        
+        # Store video title for title sequence detection
+        self.frame_scorer.video_title = video_title or ""
+        
+        # Step 1: Analyze formatted blog content for semantic sections
+        sections = self._analyze_blog_content_sections(formatted_blog_content, transcript_segments, blog_formatter)
+        
+        if not sections:
+            logger.error("❌ No semantic sections created from blog content - timestamp mapping failed")
+            raise ValueError("Failed to map blog sections to timestamps. The improved flow requires accurate section-to-timestamp mapping.")
+        
+        logger.info(f"📋 Created {len(sections)} semantic sections from blog content:")
+        for i, section in enumerate(sections):
+            logger.info(f"   Section {i+1}: '{section['title']}' ({section['start_time']:.1f}s-{section['end_time']:.1f}s, {section.get('importance', 'medium')} importance)")
+        
+        # Step 2: Extract candidate frames ONCE for all sections (OPTIMIZATION!)
+        logger.info("🎬 Extracting candidate frames for all sections...")
+        all_candidate_frames = self._extract_all_candidate_frames(
+            video_path, sections, temp_dir
+        )
+        
+        if not all_candidate_frames:
+            logger.error("❌ No candidate frames extracted - check video processing")
+            return []
+        
+        logger.info(f"📸 Total candidate frames available: {len(all_candidate_frames)}")
+        timestamps = [f"{f['timestamp']:.1f}s" for f in all_candidate_frames[:10]]
+        logger.info(f"   Sample timestamps: {timestamps}{'...' if len(all_candidate_frames) > 10 else ''}")
+        
+        # Step 3: For each section, score and select from pre-extracted frames
+        all_selected_frames = []
+        for section in sections:
+            logger.info(f"🎯 Selecting frames for section: '{section['title']}'")
+            section_frames = self._select_frames_for_section_from_candidates(
+                all_candidate_frames, section
+            )
+            all_selected_frames.extend(section_frames)
+        
+        logger.info(f"📋 Initial selection: {len(all_selected_frames)} frames from {len(sections)} sections")
+        
+        # Step 4: Apply cross-section diversity filtering
+        logger.info("🎨 Applying cross-section diversity filtering...")
+        diversity_filtered_frames = self._apply_cross_section_diversity(all_selected_frames)
+        
+        # Step 5: Final deduplication and quality filtering
+        final_frames = self._deduplicate_and_filter_frames(diversity_filtered_frames)
+        
+        logger.info(f"✅ Blog-content semantic selection complete: {len(final_frames)} frames selected")
         return final_frames
     
     def _select_frames_for_section(
@@ -755,15 +825,17 @@ class SemanticFrameSelector:
             # Sort by diversity-adjusted score
             frames.sort(key=lambda x: x['diversity_adjusted_score'], reverse=True)
             
-            # Determine how many frames this section should get
+            # Determine how many frames this section should get (aligned with selection logic)
             importance = frames[0].get('section_importance', 'medium') if frames else 'medium'
-            frame_counts = {'high': 3, 'medium': 2, 'low': 1}
-            max_frames = frame_counts.get(importance, 2)
+            frame_counts = {'high': 5, 'medium': 4, 'low': 3}  # Aligned with updated selection logic
+            max_frames = frame_counts.get(importance, 4)
             
             selected_count = 0
             for frame in frames:
                 # Take best frames up to section limit, with minimum quality threshold
-                if selected_count < max_frames and frame['diversity_adjusted_score'] > 20.0:
+                # Use a much lower diversity threshold since penalties can be aggressive
+                diversity_threshold = self.config.get('semantic_frame_selection', {}).get('diversity_threshold', 10.0)
+                if selected_count < max_frames and frame['diversity_adjusted_score'] > diversity_threshold:
                     final_frames.append(frame)
                     selected_count += 1
                     logger.info(f"   ✅ Kept {frame['timestamp']:.1f}s from '{section}' (diversity score: {frame['diversity_adjusted_score']:.1f})")
@@ -923,7 +995,8 @@ class SemanticFrameSelector:
         
         # Remove frames that are too close in time (prevent duplicates)
         filtered_frames = []
-        min_time_gap = 10.0  # Minimum 10 seconds between frames
+        # Much smaller gap for technical content - configurable
+        min_time_gap = self.config.get('semantic_frame_selection', {}).get('min_time_gap_seconds', 0.5)
         
         for frame in frames:
             timestamp = frame['timestamp']
@@ -990,3 +1063,206 @@ class SemanticFrameSelector:
         logger.info(f"   Ratio: {comparison['improvement_ratio']:.2f}")
         
         return comparison
+    
+    def _analyze_blog_content_sections(self, formatted_blog_content: str, transcript_segments: List[Dict], blog_formatter=None) -> List[Dict]:
+        """Analyze formatted blog content to extract semantic sections with timestamps."""
+        
+        logger.info("🧠 Analyzing formatted blog content for semantic sections...")
+        
+        # Try to get boundary map from blog formatter if available
+        boundary_map = getattr(blog_formatter, 'boundary_map', {}) if blog_formatter else {}
+        
+        # Extract headers from blog content (these are the semantic sections)
+        import re
+        header_pattern = r'^(#{1,3})\s+(.+)$'
+        lines = formatted_blog_content.split('\n')
+        
+        sections = []
+        current_section = None
+        section_content = []
+        
+        for line in lines:
+            header_match = re.match(header_pattern, line, re.MULTILINE)
+            if header_match:
+                # Save previous section if exists
+                if current_section:
+                    current_section['content'] = '\n'.join(section_content)
+                    current_section['end_time'] = self._estimate_section_end_time(
+                        current_section, transcript_segments
+                    )
+                    sections.append(current_section)
+                
+                # Start new section
+                header_level = len(header_match.group(1))
+                section_title = header_match.group(2).strip()
+                
+                # Try to get start time from boundary map first, then fallback to estimation
+                if section_title in boundary_map:
+                    start_time = boundary_map[section_title]
+                    logger.info(f"   🎯 Using boundary marker for '{section_title}' at {start_time:.1f}s")
+                else:
+                    start_time = self._estimate_section_start_time(section_title, transcript_segments)
+                
+                current_section = {
+                    'title': section_title,
+                    'start_time': start_time,
+                    'importance': self._determine_section_importance(header_level, section_title),
+                    'visual_cues': self._extract_visual_cues_from_title(section_title),
+                    'mentioned_text': self._extract_key_terms_from_title(section_title),
+                    'ui_elements': []
+                }
+                section_content = []
+            else:
+                if current_section:
+                    section_content.append(line)
+        
+        # Add final section
+        if current_section:
+            current_section['content'] = '\n'.join(section_content)
+            current_section['end_time'] = self._estimate_section_end_time(
+                current_section, transcript_segments
+            )
+            sections.append(current_section)
+        
+        # Filter out sections that are too short or couldn't be mapped to timestamps
+        valid_sections = []
+        for section in sections:
+            if (section['start_time'] is not None and 
+                section['end_time'] is not None and
+                section['end_time'] > section['start_time']):
+                valid_sections.append(section)
+                logger.info(f"   ✅ Section: '{section['title']}' ({section['start_time']:.1f}s-{section['end_time']:.1f}s)")
+            else:
+                logger.warning(f"   ⚠️  Skipped section: '{section['title']}' (couldn't map to timestamps)")
+        
+        logger.info(f"📋 Extracted {len(valid_sections)} valid sections from blog content")
+        return valid_sections
+    
+    def _estimate_section_start_time(self, section_title: str, transcript_segments: List[Dict]) -> Optional[float]:
+        """Estimate when a section starts based on transcript content (fallback only)."""
+        
+        # This should only be used as fallback when boundary markers fail
+        logger.warning(f"   ⚠️  Using fallback mapping for '{section_title}' - boundary markers failed")
+        
+        # If no match found, return None (section will be filtered out)
+        return None
+    
+    def _estimate_section_end_time(self, section: Dict, transcript_segments: List[Dict]) -> Optional[float]:
+        """Estimate when a section ends based on content length and transcript."""
+        
+        start_time = section['start_time']
+        if start_time is None:
+            return None
+        
+        # Estimate duration based on content length (rough heuristic)
+        content_length = len(section.get('content', ''))
+        estimated_duration = max(30, min(180, content_length / 20))  # 30-180 seconds
+        
+        # Find actual end based on transcript segments
+        end_time = start_time + estimated_duration
+        
+        # Make sure we don't exceed total video duration
+        if transcript_segments:
+            # Handle both key formats for compatibility
+            max_time = max(seg.get('end_time', seg.get('end', 0)) for seg in transcript_segments)
+            end_time = min(end_time, max_time)
+        
+        return end_time
+    
+    def _determine_section_importance(self, header_level: int, section_title: str) -> str:
+        """Determine section importance based on header level and title."""
+        
+        # H1 = high, H2 = medium, H3+ = low
+        if header_level == 1:
+            return 'high'
+        elif header_level == 2:
+            return 'medium'
+        else:
+            return 'low'
+    
+    def _extract_visual_cues_from_title(self, section_title: str) -> List[str]:
+        """Extract visual cues from section title."""
+        
+        title_lower = section_title.lower()
+        visual_cues = []
+        
+        # Common visual cue patterns
+        if 'setup' in title_lower or 'configuration' in title_lower:
+            visual_cues.extend(['settings', 'configuration', 'setup screens'])
+        if 'dashboard' in title_lower or 'interface' in title_lower:
+            visual_cues.extend(['dashboard', 'main interface', 'ui'])
+        if 'device' in title_lower or 'automation' in title_lower:
+            visual_cues.extend(['devices', 'automation', 'controls'])
+        if 'install' in title_lower or 'add' in title_lower:
+            visual_cues.extend(['installation', 'add screens', 'dialogs'])
+        
+        return visual_cues or ['interface']  # Default fallback
+    
+    def _extract_key_terms_from_title(self, section_title: str) -> List[str]:
+        """Extract key searchable terms from section title."""
+        
+        # Split title into words and filter out common words
+        import re
+        words = re.findall(r'\b\w+\b', section_title.lower())
+        
+        # Remove common stop words
+        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'how', 'what', 'why', 'when', 'where'}
+        key_terms = [word for word in words if word not in stop_words and len(word) > 2]
+        
+        return key_terms[:5]  # Limit to top 5 terms
+    
+    def _select_frames_for_section_from_candidates(self, candidate_frames: List[Dict], section: Dict) -> List[Dict]:
+        """Select best frames for a section from pre-extracted candidates."""
+        
+        start_time = section['start_time']
+        end_time = section['end_time']
+        
+        # Filter candidates to section timeframe
+        section_candidates = [
+            frame for frame in candidate_frames
+            if start_time <= frame['timestamp'] <= end_time
+        ]
+        
+        if not section_candidates:
+            logger.warning(f"   ⚠️  No candidate frames found for section '{section['title']}' ({start_time:.1f}s-{end_time:.1f}s)")
+            return []
+        
+        # Score each candidate frame for this section
+        scored_frames = []
+        for frame_info in section_candidates:
+            score = self.frame_scorer.calculate_semantic_score(
+                frame_info['path'], section
+            )
+            frame_info['semantic_score'] = score
+            frame_info['section_title'] = section['title']
+            frame_info['section_importance'] = section.get('importance', 'medium')
+            scored_frames.append((score, frame_info))
+        
+        # Sort by score and select top frames
+        scored_frames.sort(key=lambda x: x[0], reverse=True)
+        
+        # Determine how many frames to select based on section importance and duration
+        section_duration = end_time - start_time
+        importance = section.get('importance', 'medium')
+        
+        if importance == 'high':
+            target_frames = max(3, min(5, int(section_duration / 45)))  # More generous
+        elif importance == 'medium':
+            target_frames = max(2, min(4, int(section_duration / 60)))  # At least 2 frames, up to 4
+        else:  # low importance
+            target_frames = max(1, min(3, int(section_duration / 90)))   # At least 1, up to 3
+        
+        # Apply score threshold filtering
+        score_threshold = self.config.get('semantic_frame_selection', {}).get('score_threshold', 35.0)
+        selected_frames = []
+        
+        for score, frame_info in scored_frames[:target_frames * 2]:  # Consider more candidates
+            if score >= score_threshold:
+                selected_frames.append(frame_info)
+                if len(selected_frames) >= target_frames:
+                    break
+        
+        scores = [f['semantic_score'] for f in selected_frames]
+        formatted_scores = [f"{score:.1f}" for score in scores]
+        logger.info(f"   🎯 Selected {len(selected_frames)} frames for '{section['title']}' (scores: {formatted_scores})")
+        return selected_frames

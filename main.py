@@ -14,6 +14,7 @@ from transcript_parser import TranscriptParser
 from transcript_extractor import TranscriptExtractor
 from hugo_generator import HugoGenerator
 from semantic_frame_selector import SemanticFrameSelector
+from blog_formatter import BlogFormatter
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ class YouTube2Hugo:
         self.transcript_extractor = TranscriptExtractor(config_dict)
         self.hugo_generator = HugoGenerator(config_dict)
         self.semantic_frame_selector = SemanticFrameSelector(config_dict, self.video_processor)
+        self.blog_formatter = BlogFormatter(config_dict)
     
     def process_video(
         self,
@@ -63,19 +65,23 @@ class YouTube2Hugo:
                         transcript_segments, transcript_output, 'srt'
                     )
             
-            # Extract and analyze video frames using semantic approach
-            logger.info("Extracting video frames with semantic content analysis...")
-            semantic_frames = self.semantic_frame_selector.select_frames_semantically(
-                video_path, transcript_segments, temp_dir, title
+            # Generate blog post title if not provided (needed for formatting)
+            if not title:
+                title = self._generate_title_from_path(video_path)
+            
+            # First: Format transcript into structured blog content (with corrections and structure)
+            logger.info("Formatting transcript into structured blog content...")
+            formatted_blog_content = self.blog_formatter.format_transcript_content(transcript_segments, title)
+            
+            # Second: Extract and analyze video frames using semantic approach on formatted content
+            logger.info("Extracting video frames with semantic content analysis on formatted blog...")
+            semantic_frames = self.semantic_frame_selector.select_frames_from_blog_content(
+                video_path, transcript_segments, formatted_blog_content, temp_dir, title, self.blog_formatter
             )
             
             # Optimize semantic frames (ensure proper formatting and optimization)
             logger.info("Optimizing semantic frames...")
             optimized_frames = self.video_processor.optimize_images(semantic_frames)
-            
-            # Generate blog post title if not provided
-            if not title:
-                title = self._generate_title_from_path(video_path)
             
             # Prepare video info
             if not video_info:
@@ -84,11 +90,11 @@ class YouTube2Hugo:
             # Adjust output path based on config
             final_output_path = self._get_configured_output_path(output_path, title)
             
-            # Generate Hugo blog post
+            # Generate Hugo blog post with pre-formatted content
             logger.info("Generating Hugo blog post...")
-            blog_post = self.hugo_generator.generate_blog_post(
+            blog_post = self.hugo_generator.generate_blog_post_with_formatted_content(
                 title=title,
-                transcript_segments=transcript_segments,
+                formatted_content=formatted_blog_content,
                 frame_data=optimized_frames,
                 video_info=video_info,
                 output_path=final_output_path,

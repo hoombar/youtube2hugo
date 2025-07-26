@@ -21,10 +21,13 @@ class TranscriptExtractor:
         self.gemini_client = None
         
         # Initialize Gemini client if API key is provided
-        api_key = config.get('gemini_api_key') or os.getenv('GOOGLE_API_KEY')
+        api_key = (config.get('gemini_api_key') or 
+                  config.get('gemini', {}).get('api_key') or 
+                  os.getenv('GOOGLE_API_KEY'))
         if api_key:
             genai.configure(api_key=api_key)
-            model_name = config.get('gemini_model', 'gemini-2.5-flash')
+            model_name = (config.get('gemini_model') or 
+                         config.get('gemini', {}).get('model', 'gemini-2.5-flash'))
             self.gemini_client = genai.GenerativeModel(model_name)
             logger.info(f"Gemini API client initialized for transcript cleanup with model: {model_name}")
         else:

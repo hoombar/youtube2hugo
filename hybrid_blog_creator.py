@@ -175,18 +175,21 @@ class HybridBlogCreator:
                 logger.warning("⚠️  WARNING: Content may not have proper blog structure")
             
         except (SystemExit, ValueError) as e:
-            logger.error(f"❌ AI processing failed ({type(e).__name__}: {e}) - using basic sections")
-            if "safety filter" in str(e).lower():
+            logger.error(f"❌ AI processing failed ({type(e).__name__}: {e})")
+            if "safety filter" in str(e).lower() or "All prompting strategies failed" in str(e):
                 logger.error(f"🚨 GEMINI SAFETY FILTER: The video content triggered Gemini's safety filters")
-                logger.error(f"💡 This is usually due to technical content being misidentified as potentially harmful")
-                logger.error(f"📝 Consider using a different video or manually editing the transcript")
+                logger.error(f"💡 Multiple prompting strategies were attempted but all were blocked")
+                logger.error(f"📝 This is usually due to technical content being misidentified as potentially harmful")
+                logger.error(f"🔧 The system will create basic sections but content will be transcript-like")
+                logger.error(f"⚠️  Consider: 1) Using a different video, 2) Different AI service, 3) Manual editing")
             logger.error(f"⚠️  This failure should NOT be affected by processing_mode: {processing_mode}")
             logger.error(f"🚨 IMPORTANT: User will see transcript-like content instead of blog content!")
             try:
-                sections = self._create_basic_sections_from_transcript(transcript_segments)
-                blog_content = self._format_basic_content(sections, title)
-                logger.warning(f"📄 Created {len(sections)} basic sections as fallback")
-                logger.warning(f"⚠️  These sections contain raw transcript content, not blog-formatted content")
+                # Create better basic sections that are more blog-like
+                sections = self._create_enhanced_basic_sections_from_transcript(transcript_segments)
+                blog_content = self._format_enhanced_basic_content(sections, title)
+                logger.warning(f"📄 Created {len(sections)} enhanced basic sections as fallback")
+                logger.warning(f"⚠️  These sections contain improved transcript content, but not full AI formatting")
                 
                 # Add paragraphs to basic sections too
                 for section in sections:
@@ -493,6 +496,125 @@ class HybridBlogCreator:
         
         return content
     
+    def _create_enhanced_basic_sections_from_transcript(self, transcript_segments: List[Dict]) -> List[Dict]:
+        """Create more blog-like sections from transcript when AI processing fails."""
+        if not transcript_segments:
+            return []
+        
+        # Group transcript segments into logical sections (longer than basic)
+        sections = []
+        current_section_segments = []
+        current_section_duration = 0
+        target_section_duration = 90  # 1.5 minutes per section for better content
+        
+        for segment in transcript_segments:
+            segment_duration = segment['end_time'] - segment['start_time']
+            
+            # Add segment to current section
+            current_section_segments.append(segment)
+            current_section_duration += segment_duration
+            
+            # Check if we should finalize this section
+            if current_section_duration >= target_section_duration and len(current_section_segments) >= 3:
+                sections.append(self._create_enhanced_section_from_segments(current_section_segments, len(sections) + 1))
+                current_section_segments = []
+                current_section_duration = 0
+        
+        # Handle remaining segments
+        if current_section_segments:
+            sections.append(self._create_enhanced_section_from_segments(current_section_segments, len(sections) + 1))
+        
+        return sections
+    
+    def _create_enhanced_section_from_segments(self, segments: List[Dict], section_number: int) -> Dict:
+        """Create an enhanced section from transcript segments with better formatting."""
+        if not segments:
+            return {}
+        
+        start_time = segments[0]['start_time']
+        end_time = segments[-1]['end_time']
+        
+        # Combine and clean transcript text
+        combined_text = ' '.join([seg['text'] for seg in segments])
+        
+        # Basic cleaning and formatting
+        lines = combined_text.split('.')
+        cleaned_lines = []
+        
+        for line in lines:
+            line = line.strip()
+            if len(line) > 10:  # Skip very short fragments
+                # Capitalize first letter and add period if needed
+                line = line[0].upper() + line[1:] if line else line
+                if not line.endswith('.'):
+                    line += '.'
+                cleaned_lines.append(line)
+        
+        # Group sentences into paragraphs (3-4 sentences each)
+        paragraphs = []
+        current_paragraph = []
+        
+        for line in cleaned_lines:
+            current_paragraph.append(line)
+            if len(current_paragraph) >= 3:  # Create paragraph every 3 sentences
+                paragraphs.append(' '.join(current_paragraph))
+                current_paragraph = []
+        
+        # Add remaining sentences
+        if current_paragraph:
+            paragraphs.append(' '.join(current_paragraph))
+        
+        # Create content with paragraph breaks
+        content = '\n\n'.join(paragraphs)
+        
+        # Generate a meaningful title based on content keywords
+        title = self._generate_section_title(content, section_number)
+        
+        return {
+            'title': title,
+            'start_time': start_time,
+            'end_time': end_time,
+            'content': content,
+            'paragraphs': self._split_into_paragraphs(content, start_time, end_time)
+        }
+    
+    def _generate_section_title(self, content: str, section_number: int) -> str:
+        """Generate a meaningful title from section content."""
+        # Simple keyword extraction for title generation
+        words = content.lower().split()
+        
+        # Common meaningful words that could indicate topic
+        topic_indicators = [
+            'setup', 'configuration', 'install', 'create', 'build', 'deploy', 
+            'tutorial', 'guide', 'example', 'demo', 'introduction', 'overview',
+            'implementation', 'development', 'testing', 'debugging', 'optimization',
+            'security', 'performance', 'database', 'server', 'client', 'api',
+            'frontend', 'backend', 'framework', 'library', 'application'
+        ]
+        
+        # Look for topic indicators in content
+        found_topics = [word for word in words if word in topic_indicators]
+        
+        if found_topics:
+            # Use the first meaningful topic found
+            topic = found_topics[0].capitalize()
+            return f"{topic} Overview"
+        else:
+            # Fallback to generic section naming
+            return f"Section {section_number}"
+    
+    def _format_enhanced_basic_content(self, sections: List[Dict], title: str) -> str:
+        """Format enhanced basic content with better structure than raw transcript."""
+        content = f"# {title}\n\n"
+        content += "_This content was automatically generated from video transcript. Some AI processing features may have been limited._\n\n"
+        
+        for section in sections:
+            content += f"## {section['title']}\n\n"
+            content += f"{section['content']}\n\n"
+            content += "{{< image-placeholder >}}\n\n"
+        
+        return content
+    
     def _extract_frames_by_section(self, video_path: str, sections: List[Dict], session_dir: str, processing_mode: str = 'smart') -> List[Dict]:
         """Extract candidate frames for each section."""
         frames_dir = os.path.join(session_dir, 'frames')
@@ -510,7 +632,21 @@ class HybridBlogCreator:
             video_processor = VideoProcessor(self.config)
             transcript_extractor = TranscriptExtractor(self.config)
             transcript_segments = transcript_extractor.extract_transcript(video_path)
-            candidate_frames = video_processor.extract_frames(video_path, temp_frames_dir, transcript_segments)
+            smart_frames = video_processor.extract_frames(video_path, temp_frames_dir, transcript_segments)
+            
+            # Convert dict format to namedtuple format for compatibility
+            from collections import namedtuple
+            Frame = namedtuple('Frame', ['filename', 'timestamp', 'path'])
+            candidate_frames = []
+            
+            for frame_dict in smart_frames:
+                # Extract filename from path if not provided
+                filename = frame_dict.get('filename') or os.path.basename(frame_dict['path'])
+                candidate_frames.append(Frame(
+                    filename=filename,
+                    timestamp=frame_dict['timestamp'],
+                    path=frame_dict['path']
+                ))
         elif processing_mode == 'dedupe':
             # Extract every 0.5s, then remove duplicates
             candidate_frames = self._extract_raw_frames(video_path, temp_frames_dir)
@@ -673,7 +809,7 @@ class HybridBlogCreator:
             return []
     
     def _remove_duplicate_frames(self, frames: List, frames_dir: str) -> List:
-        """Remove duplicate frames using image similarity with sliding window approach."""
+        """Remove duplicate frames using improved sliding window approach with caching."""
         import cv2
         import numpy as np
         
@@ -689,53 +825,63 @@ class HybridBlogCreator:
             logger.info(f"📊 Sample timestamps: {timestamps[:10]} ... {timestamps[-10:] if len(timestamps) > 10 else []}")
         
         unique_frames = []
-        # Use a much more permissive threshold for duplicate detection (higher means more strict)
-        similarity_threshold = 0.99  # 99% similar = duplicate (much less aggressive)
-        window_size = 5   # Smaller window to prevent over-comparison across time
-        min_time_gap = 5.0  # Minimum 5 seconds between frames to ensure distribution
+        # Much less aggressive settings - allow more variation
+        similarity_threshold = 0.88  # 88% similar = duplicate (was 0.92, reducing further for less aggressive filtering)
+        window_size = 5  # Compare against fewer frames for speed
+        min_time_gap = 2.0  # Minimum 2 seconds between frames for better distribution 
         frames_processed = 0
         frames_skipped_due_to_errors = 0
+        image_cache = {}  # Cache processed images
         
         for i, frame in enumerate(frames):
             is_duplicate = False
             frames_processed += 1
             
-            # Progress logging every 100 frames
-            if frames_processed % 100 == 0:
+            # Progress logging every 200 frames
+            if frames_processed % 200 == 0:
                 logger.info(f"🔄 Processing frame {frames_processed}/{len(frames)} (timestamp: {frame.timestamp:.1f}s)")
             
             try:
-                current_img = cv2.imread(frame.path)
-                if current_img is None:
-                    logger.debug(f"Could not read frame file: {frame.path}")
-                    frames_skipped_due_to_errors += 1
-                    continue
+                # Use cached image if available
+                if frame.path not in image_cache:
+                    current_img = cv2.imread(frame.path)
+                    if current_img is None:
+                        logger.debug(f"Could not read frame file: {frame.path}")
+                        frames_skipped_due_to_errors += 1
+                        continue
                     
-                # Convert to grayscale and resize for faster comparison
-                current_gray = cv2.cvtColor(current_img, cv2.COLOR_BGR2GRAY)
-                current_small = cv2.resize(current_gray, (32, 32))  # Smaller for speed
+                    # Convert to grayscale and resize for faster comparison
+                    current_gray = cv2.cvtColor(current_img, cv2.COLOR_BGR2GRAY)
+                    current_small = cv2.resize(current_gray, (32, 32))  # Slightly larger for better accuracy
+                    image_cache[frame.path] = current_small
+                else:
+                    current_small = image_cache[frame.path]
                 
-                # Enforce minimum time gap between frames
+                # Enforce minimum time gap between frames (simple temporal filtering)
                 if unique_frames:
                     last_frame_time = unique_frames[-1].timestamp
                     if frame.timestamp - last_frame_time < min_time_gap:
-                        # Skip this frame if it's too close to the last kept frame
                         logger.debug(f"Skipping frame {frame.filename} at {frame.timestamp:.1f}s (too close to {last_frame_time:.1f}s)")
+                        is_duplicate = True  # Mark as duplicate but continue processing
                         continue
                 
-                # Only compare with recent unique frames (sliding window)
+                # Compare with recent unique frames (sliding window)
                 comparison_frames = unique_frames[-window_size:] if len(unique_frames) > window_size else unique_frames
                 
                 for unique_frame in comparison_frames:
                     try:
-                        unique_img = cv2.imread(unique_frame.path)
-                        if unique_img is None:
-                            continue
-                            
-                        unique_gray = cv2.cvtColor(unique_img, cv2.COLOR_BGR2GRAY)
-                        unique_small = cv2.resize(unique_gray, (32, 32))
+                        # Use cached image if available
+                        if unique_frame.path not in image_cache:
+                            unique_img = cv2.imread(unique_frame.path)
+                            if unique_img is None:
+                                continue
+                            unique_gray = cv2.cvtColor(unique_img, cv2.COLOR_BGR2GRAY)
+                            unique_small = cv2.resize(unique_gray, (32, 32))
+                            image_cache[unique_frame.path] = unique_small
+                        else:
+                            unique_small = image_cache[unique_frame.path]
                         
-                        # Calculate normalized cross correlation for better similarity detection
+                        # Calculate normalized cross correlation for similarity detection
                         correlation = cv2.matchTemplate(current_small, unique_small, cv2.TM_CCOEFF_NORMED)[0][0]
                         
                         if correlation > similarity_threshold:
@@ -769,7 +915,51 @@ class HybridBlogCreator:
             else:
                 logger.info(f"📊 Final timestamps: {final_timestamps[:10]} ... {final_timestamps[-10:]}")
         
+        # Safety check: ensure we have frames covering the full video duration
+        if unique_frames and len(frames) > 0:
+            original_duration = max(f.timestamp for f in frames)
+            final_duration = max(f.timestamp for f in unique_frames)
+            coverage_ratio = final_duration / original_duration if original_duration > 0 else 0
+            
+            logger.info(f"📊 Video coverage: {final_duration:.1f}s / {original_duration:.1f}s ({coverage_ratio:.1%})")
+            
+            # If we're only covering less than 50% of the video, fall back to sampling
+            if coverage_ratio < 0.5 and len(unique_frames) < 50:
+                logger.warning(f"⚠️ Poor video coverage ({coverage_ratio:.1%}), adding sampling fallback...")
+                unique_frames = self._add_sampling_fallback(frames, unique_frames, target_count=100)
+        
         return unique_frames
+    
+    def _add_sampling_fallback(self, original_frames: List, current_frames: List, target_count: int = 100) -> List:
+        """Add evenly distributed frames as fallback when deduplication is too aggressive."""
+        if not original_frames:
+            return current_frames
+        
+        # Calculate sampling interval to get target number of frames
+        total_duration = max(f.timestamp for f in original_frames)
+        sampling_interval = total_duration / target_count
+        
+        sampled_frames = []
+        existing_timestamps = {f.timestamp for f in current_frames}
+        
+        # Add evenly spaced frames that don't already exist
+        for i in range(target_count):
+            target_timestamp = i * sampling_interval
+            
+            # Find the closest frame to this timestamp
+            closest_frame = min(original_frames, key=lambda f: abs(f.timestamp - target_timestamp))
+            
+            # Only add if we don't already have this timestamp (within 1 second tolerance)
+            if not any(abs(closest_frame.timestamp - ts) < 1.0 for ts in existing_timestamps):
+                sampled_frames.append(closest_frame)
+                existing_timestamps.add(closest_frame.timestamp)
+        
+        # Combine and sort by timestamp
+        combined_frames = current_frames + sampled_frames
+        combined_frames.sort(key=lambda f: f.timestamp)
+        
+        logger.info(f"📊 Sampling fallback: added {len(sampled_frames)} frames, total now {len(combined_frames)}")
+        return combined_frames
     
     def save_selections(self, selections_data: Dict):
         """Save frame selections for each section."""
@@ -810,10 +1000,30 @@ class HybridBlogCreator:
                 src_path = os.path.join(session_dir, 'frames', frame_filename)
                 
                 if os.path.exists(src_path):
+                    # Extract timestamp from filename (assumes format like "frame_123.5s.jpg")
+                    timestamp = 0.0
+                    try:
+                        # Try to extract timestamp from filename
+                        import re
+                        match = re.search(r'(\d+\.?\d*)s?\.jpg', frame_filename)
+                        if match:
+                            timestamp = float(match.group(1))
+                        else:
+                            # Fallback: try to get from frame index (frame_00123.jpg -> 123 * 0.5)
+                            match = re.search(r'frame_(\d+)\.jpg', frame_filename)
+                            if match:
+                                frame_index = int(match.group(1))
+                                timestamp = frame_index * 0.5
+                    except:
+                        timestamp = 0.0
+                    
                     selected_frames.append({
                         'filename': frame_filename,
                         'path': src_path,
-                        'section': section_data['section_title']
+                        'section': section_data['section_title'],
+                        'section_title': section_data['section_title'],
+                        'timestamp': timestamp,
+                        'should_include': True  # Mark as selected for processing
                     })
         
         # Generate blog using Hugo generator
