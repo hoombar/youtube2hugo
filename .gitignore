@@ -17,6 +17,10 @@ frame_test_output/
 test_output/
 temp_frames/
 
+# Blog session data (temporary working files)
+blog_sessions/
+training_data/
+
 # Hugo content (generated)
 content/posts/*/
 !content/posts/.gitkeep
