@@ -4,19 +4,29 @@ Convert YouTube videos into structured Hugo blog posts with intelligent frame se
 
 ## Features
 
+### Core Functionality
 - **Automatic Transcript Extraction**: Uses OpenAI Whisper to extract transcripts directly from video
 - **AI-Powered Content Enhancement**: 
   - **Semantic Frame Selection**: Gemini AI analyzes transcript content to intelligently select relevant frames
   - **Content-Aware Formatting**: Single-pass blog post generation with contextual image placement
+  - **Multi-Strategy Prompting**: Robust AI processing with fallback strategies to handle content restrictions
 - **Smart Frame Analysis**: Uses computer vision to identify frames containing visual aids (not talking head shots)  
 - **Multi-format Support**: Handles existing SRT, VTT, and plain text transcripts or extracts new ones
 - **Intelligent Image Placement**: Only extracts frames where visual content is prominent
 - **Template System**: Use custom templates with placeholders ({{title}}, {{content}}, {{date}}, etc.)
 - **Hugo Integration**: Generates properly formatted Hugo markdown with front matter
 - **Page Bundle Structure**: Creates self-contained post folders with relative image paths
-- **Configurable Processing**: Adjustable thresholds for face detection and frame selection
-- **Batch Processing**: Handle multiple videos at once
-- **CLI Interface**: Easy-to-use command-line interface
+
+### Processing Modes
+- **CLI Mode**: Traditional command-line interface for automated processing
+- **Hybrid Mode**: Web-based interface combining AI processing with manual frame selection
+- **Batch Processing**: Handle multiple videos at once with configuration files
+
+### Advanced Tools
+- **Frame Selection Training**: Machine learning tools to optimize frame selection algorithms
+- **Performance Analysis**: Scripts to evaluate and tune frame selection quality
+- **Testing Suite**: Comprehensive testing tools for algorithm validation
+- **Debug Tools**: Detailed debugging capabilities for troubleshooting processing issues
 
 ## Installation
 
@@ -45,6 +55,8 @@ sudo apt update && sudo apt install ffmpeg
 
 ## Quick Start
 
+### Method 1: Command Line Interface (CLI)
+
 1. **Install Dependencies**
    ```bash
    pip install -r requirements.txt
@@ -72,6 +84,28 @@ sudo apt update && sudo apt install ffmpeg
    ```
    
    The post will be created at: `/path/to/your/hugo/site/content/posts/my-amazing-tutorial/`
+
+### Method 2: Hybrid Web Interface (Recommended)
+
+For more control over frame selection and better results:
+
+1. **Start the Web Interface**
+   ```bash
+   python create_blog.py
+   ```
+
+2. **Open Your Browser**
+   - Navigate to `http://127.0.0.1:5002`
+   - Upload your video file path and title
+   - Choose processing mode (smart/dedupe/raw)
+
+3. **Review and Select Frames**
+   - AI processes transcript and creates sections
+   - Review candidate frames for each section
+   - Select the best frames manually
+   - Generate final blog post
+
+This method provides better quality control and allows manual frame curation.
 
 ### Using existing transcript:
 
@@ -166,6 +200,49 @@ videos:
 Run batch processing:
 ```bash
 python main.py batch-process batch_config.yaml
+```
+
+### Frame Processing Modes
+
+The hybrid interface offers three processing modes:
+
+- **Smart**: Uses AI-powered analysis to extract semantically relevant frames
+- **Dedupe**: Extracts frames every 0.5s and removes duplicates using perceptual hashing
+- **Raw**: Fast extraction of frames every 0.5s without duplicate removal
+
+### Algorithm Training and Optimization
+
+The project includes sophisticated tools for improving frame selection:
+
+#### Frame Selection Training
+```bash
+# Train the algorithm on known good timestamps
+python train_frame_selection.py video.mp4 --good-timestamps "8.0,15.0,22.0"
+
+# Cumulative learning from multiple videos
+python cumulative_trainer.py --videos video1.mp4,video2.mp4,video3.mp4
+```
+
+#### Performance Analysis
+```bash
+# Analyze frame selection quality
+python frame_selection_analyzer.py video.mp4
+
+# Test different similarity thresholds
+python test_similarity_thresholds.py video.mp4
+
+# Quick frame analysis for debugging
+python quick_frame_analysis.py video.mp4
+```
+
+#### Debug Tools
+```bash
+# Debug timing and boundary issues
+python debug_boundary_markers.py video.mp4
+python debug_frame_timing.py video.mp4
+
+# Test AI processing independently
+python test_ai_processing.py
 ```
 
 ### Custom Whisper Models
@@ -320,6 +397,8 @@ python main.py convert \
 ```
 youtube2hugo/
 ├── main.py                 # Main CLI application
+├── create_blog.py          # Hybrid web interface launcher
+├── hybrid_blog_creator.py  # Web-based blog creation with manual frame selection
 ├── video_processor.py      # Video analysis and frame extraction
 ├── transcript_extractor.py # Automatic transcript extraction with Whisper
 ├── transcript_parser.py    # Existing transcript file processing
@@ -329,10 +408,41 @@ youtube2hugo/
 ├── config.py              # Configuration management
 ├── requirements.txt        # Python dependencies
 ├── README.md              # This file
+├── algorithm_comparison.md # Algorithm performance analysis
+├── training/              # Frame selection training tools
+│   ├── train_frame_selection.py
+│   ├── cumulative_trainer.py
+│   ├── frame_selection_trainer.py
+│   └── demo_cumulative_learning.py
+├── analysis/              # Performance analysis tools
+│   ├── frame_selection_analyzer.py
+│   ├── quick_frame_analysis.py
+│   ├── score_threshold_tuner.py
+│   └── apply_recommendations.py
+├── testing/               # Testing and validation tools
+│   ├── test_frame_selection.py
+│   ├── test_semantic_selection.py
+│   ├── test_similarity_thresholds.py
+│   ├── test_ai_processing.py
+│   ├── test_full_frame_extraction.py
+│   ├── test_frame_cleanup.py
+│   └── test_boundary_fix.py
+├── debug/                 # Debug utilities
+│   ├── debug_boundary_markers.py
+│   ├── debug_frame_timing.py
+│   └── debug_session_creation.py
+├── templates/             # Web interface templates
+│   ├── hybrid_blog_creator.html
+│   └── frame_selector.html
+├── hugo-shortcodes/       # Hugo shortcode templates
+│   ├── README.md
+│   ├── grid-image.html
+│   └── image-grid.html
 └── examples/              # Example files
     ├── sample-transcript.srt
     ├── config-template.yaml
     ├── batch-config.yaml
+    ├── example_config_tuning.yaml
     └── templates/         # Blog post templates
         ├── basic-template.md
         ├── tech-blog-template.md
@@ -356,6 +466,13 @@ When a Gemini API key is provided, the tool performs intelligent content process
 - Generates enhanced alt text with section context
 - Creates smooth content flow with contextually appropriate visuals
 - Preserves technical accuracy while improving readability
+
+### Robust AI Processing
+- **Multi-Strategy Prompting**: Uses multiple prompting strategies to work around AI safety filters
+- **Graceful Fallbacks**: When AI processing fails, creates enhanced basic sections from transcript
+- **Content Quality Validation**: Verifies generated content meets blog post standards
+- **Safety Filter Handling**: Automatically detects and adapts to content restrictions
+- **Error Recovery**: Comprehensive error handling with informative feedback
 
 ### Example Transformation
 
@@ -496,6 +613,25 @@ python -c "import logging; logging.basicConfig(level=logging.DEBUG)" main.py con
 
 MIT License - see LICENSE file for details.
 
+## Web Interface Workflow
+
+The hybrid web interface provides a streamlined workflow:
+
+1. **Video Processing**: Upload video path and title, choose processing mode
+2. **AI Analysis**: Automatic transcript extraction and AI-powered content creation
+3. **Section Review**: Review generated sections with timing information
+4. **Frame Selection**: Browse candidate frames for each section and select the best ones
+5. **Blog Generation**: Automatically generate final Hugo blog post with selected frames
+
+### Interface Features
+
+- **Real-time Processing**: Live feedback during video analysis
+- **Image Preview**: Thumbnail previews of all candidate frames
+- **Section-based Organization**: Frames organized by content sections
+- **Manual Override**: Full control over frame selection
+- **Progress Tracking**: Clear indication of processing status
+- **Error Handling**: Graceful handling of processing failures
+
 ## Requirements
 
 - Python 3.8+
@@ -505,6 +641,8 @@ MIT License - see LICENSE file for details.
 - OpenCV
 - MediaPipe
 - PyTorch (for Whisper)
+- Flask (for web interface)
+- Additional dependencies for machine learning training tools
 - See `requirements.txt` for complete list
 
 ## Environment Variables
