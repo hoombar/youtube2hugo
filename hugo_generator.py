@@ -65,6 +65,119 @@ document.addEventListener('keydown', function(event) {
 });
 </script>'''
     
+    def _generate_transcript_toggle_html(self, transcript_segments: List[Dict]) -> str:
+        """Generate HTML and JavaScript for toggling between blog content and transcript."""
+        
+        # Convert transcript segments to sections for display
+        transcript_html = self._format_transcript_for_display(transcript_segments)
+        
+        return f'''<!-- Transcript Toggle Functionality -->
+<div id="contentToggle" style="position: fixed; top: 20px; right: 20px; z-index: 999; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 5px;">
+    <button id="toggleBtn" style="background: #667eea; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;">
+        Show Transcript
+    </button>
+</div>
+
+<div id="transcriptContent" style="display: none;">
+{transcript_html}
+</div>
+
+<script>
+let showingTranscript = false;
+const toggleBtn = document.getElementById('toggleBtn');
+const blogContent = document.querySelector('.content, main, article, #content, .post-content');
+const transcriptContent = document.getElementById('transcriptContent');
+
+// Find the main content container
+let mainContent = blogContent;
+if (!mainContent) {{
+    // Fallback: find the largest text container
+    const allDivs = document.querySelectorAll('div');
+    let maxLength = 0;
+    allDivs.forEach(div => {{
+        if (div.innerText && div.innerText.length > maxLength) {{
+            maxLength = div.innerText.length;
+            mainContent = div;
+        }}
+    }});
+}}
+
+// Store original content
+let originalContent = '';
+if (mainContent) {{
+    originalContent = mainContent.innerHTML;
+}}
+
+toggleBtn.addEventListener('click', function() {{
+    if (!mainContent) {{
+        alert('Could not find main content area for toggle');
+        return;
+    }}
+    
+    if (showingTranscript) {{
+        // Show blog content
+        mainContent.innerHTML = originalContent;
+        transcriptContent.style.display = 'none';
+        toggleBtn.textContent = 'Show Transcript';
+        showingTranscript = false;
+    }} else {{
+        // Show transcript
+        mainContent.innerHTML = transcriptContent.innerHTML;
+        toggleBtn.textContent = 'Show Blog Content';
+        showingTranscript = true;
+    }}
+}});
+</script>'''
+    
+    def _format_transcript_for_display(self, transcript_segments: List[Dict]) -> str:
+        """Format transcript segments for display with timestamps."""
+        if not transcript_segments:
+            return "<p>No transcript available.</p>"
+        
+        html_parts = []
+        current_section = None
+        current_time_range = None
+        
+        # Group segments into time-based sections (every 60 seconds)
+        section_duration = 60  # 1 minute sections
+        
+        for segment in transcript_segments:
+            segment_start = segment.get('start_time', segment.get('start', 0))
+            segment_text = segment.get('text', '')
+            
+            # Determine which section this segment belongs to
+            section_number = int(segment_start // section_duration) + 1
+            section_start_time = (section_number - 1) * section_duration
+            section_end_time = section_number * section_duration
+            
+            # Start new section if needed
+            if section_number != current_section:
+                if current_section is not None:
+                    html_parts.append('</div>')  # Close previous section
+                
+                html_parts.append(f'''<div class="transcript-section" style="margin-bottom: 30px; padding: 20px; background: #f8f9fa; border-left: 4px solid #667eea; border-radius: 4px;">
+    <h3 style="margin-top: 0; color: #333;">📝 Transcript: {self._format_time(section_start_time)} - {self._format_time(section_end_time)}</h3>''')
+                current_section = section_number
+            
+            # Add segment with timestamp
+            formatted_time = self._format_time(segment_start)
+            html_parts.append(f'''<p style="line-height: 1.6; margin-bottom: 15px;">
+    <span style="color: #667eea; font-weight: bold; font-size: 0.9em;">[{formatted_time}]</span> 
+    {segment_text}
+</p>''')
+        
+        # Close last section
+        if current_section is not None:
+            html_parts.append('</div>')
+        
+        return '\n'.join(html_parts)
+    
+    def _format_time(self, seconds: float) -> str:
+        """Format seconds into MM:SS format."""
+        minutes = int(seconds // 60)
+        secs = int(seconds % 60)
+        return f"{minutes:02d}:{secs:02d}"
+    
     def generate_blog_post(
         self, 
         title: str,
@@ -154,7 +267,8 @@ document.addEventListener('keydown', function(event) {
         video_info: Dict,
         output_path: str,
         front_matter_data: Optional[Dict] = None,
-        template_path: Optional[str] = None
+        template_path: Optional[str] = None,
+        transcript_segments: Optional[List[Dict]] = None
     ) -> str:
         """Generate a complete Hugo blog post using pre-formatted content (skips transcript formatting)."""
         
@@ -201,6 +315,11 @@ document.addEventListener('keydown', function(event) {
         modal_html = self._get_image_modal_html()
         if modal_html:
             final_content += f"\n\n{modal_html}"
+        
+        # Add transcript toggle functionality if transcript segments are provided
+        if transcript_segments:
+            toggle_html = self._generate_transcript_toggle_html(transcript_segments)
+            final_content += f"\n\n{toggle_html}"
         
         # Write index.md file in bundle directory
         index_path = os.path.join(bundle_dir, 'index.md')

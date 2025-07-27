@@ -1123,7 +1123,9 @@ class HybridBlogCreator:
                 selected_frames,
                 video_info,
                 output_dir,
-                template_path=template_path
+                front_matter_data=None,
+                template_path=template_path,
+                transcript_segments=self.current_session['transcript_segments']
             )
             
             result = {'output_file': result_path}
