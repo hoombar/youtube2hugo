@@ -66,117 +66,162 @@ document.addEventListener('keydown', function(event) {
 </script>'''
     
     def _generate_transcript_toggle_html(self, transcript_segments: List[Dict]) -> str:
-        """Generate HTML and JavaScript for toggling between blog content and transcript."""
-        
-        # Convert transcript segments to sections for display
-        transcript_html = self._format_transcript_for_display(transcript_segments)
+        """Generate HTML and JavaScript for toggling between blog content and transcript within sections."""
         
         return f'''<!-- Transcript Toggle Functionality -->
 <div id="contentToggle" style="position: fixed; top: 20px; right: 20px; z-index: 999; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 5px;">
     <button id="toggleBtn" style="background: #667eea; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;">
-        Show Transcript
+        Toggle Transcript
     </button>
-</div>
-
-<div id="transcriptContent" style="display: none;">
-{transcript_html}
 </div>
 
 <script>
 let showingTranscript = false;
 const toggleBtn = document.getElementById('toggleBtn');
-const blogContent = document.querySelector('.content, main, article, #content, .post-content');
-const transcriptContent = document.getElementById('transcriptContent');
 
-// Find the main content container
-let mainContent = blogContent;
-if (!mainContent) {{
-    // Fallback: find the largest text container
-    const allDivs = document.querySelectorAll('div');
-    let maxLength = 0;
-    allDivs.forEach(div => {{
-        if (div.innerText && div.innerText.length > maxLength) {{
-            maxLength = div.innerText.length;
-            mainContent = div;
+// Store transcript data for sections
+const transcriptData = {repr(self._prepare_transcript_data_for_sections(transcript_segments))};
+
+// Store original content for each section
+const originalSectionContent = {{}};
+
+// Initialize: find all sections and store their original content
+document.addEventListener('DOMContentLoaded', function() {{
+    const sections = document.querySelectorAll('h2, h3');
+    sections.forEach((header, index) => {{
+        // Find all content between this header and the next header
+        const sectionContent = [];
+        let nextElement = header.nextElementSibling;
+        
+        while (nextElement && !nextElement.matches('h2, h3')) {{
+            if (nextElement.tagName === 'P' || nextElement.tagName === 'DIV') {{
+                sectionContent.push(nextElement);
+            }}
+            nextElement = nextElement.nextElementSibling;
         }}
+        
+        // Store original content for each paragraph in this section
+        const sectionId = header.textContent.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        originalSectionContent[sectionId] = [];
+        
+        sectionContent.forEach(element => {{
+            originalSectionContent[sectionId].push({{
+                element: element,
+                originalHTML: element.innerHTML
+            }});
+        }});
     }});
-}}
-
-// Store original content
-let originalContent = '';
-if (mainContent) {{
-    originalContent = mainContent.innerHTML;
-}}
+}});
 
 toggleBtn.addEventListener('click', function() {{
-    if (!mainContent) {{
-        alert('Could not find main content area for toggle');
-        return;
-    }}
+    const sections = document.querySelectorAll('h2, h3');
     
-    if (showingTranscript) {{
-        // Show blog content
-        mainContent.innerHTML = originalContent;
-        transcriptContent.style.display = 'none';
-        toggleBtn.textContent = 'Show Transcript';
-        showingTranscript = false;
-    }} else {{
-        // Show transcript
-        mainContent.innerHTML = transcriptContent.innerHTML;
-        toggleBtn.textContent = 'Show Blog Content';
-        showingTranscript = true;
-    }}
+    sections.forEach((header, sectionIndex) => {{
+        const sectionTitle = header.textContent.trim();
+        const sectionId = sectionTitle.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        
+        // Find paragraphs in this section
+        const sectionContent = [];
+        let nextElement = header.nextElementSibling;
+        
+        while (nextElement && !nextElement.matches('h2, h3')) {{
+            if (nextElement.tagName === 'P' || nextElement.tagName === 'DIV') {{
+                // Skip image containers
+                if (!nextElement.querySelector('img') && nextElement.innerText.trim().length > 20) {{
+                    sectionContent.push(nextElement);
+                }}
+            }}
+            nextElement = nextElement.nextElementSibling;
+        }}
+        
+        if (showingTranscript) {{
+            // Switch back to formatted content
+            if (originalSectionContent[sectionId]) {{
+                originalSectionContent[sectionId].forEach(item => {{
+                    item.element.innerHTML = item.originalHTML;
+                }});
+            }}
+        }} else {{
+            // Switch to transcript content
+            const transcriptForSection = transcriptData[sectionIndex] || [];
+            
+            sectionContent.forEach((element, paragraphIndex) => {{
+                if (transcriptForSection[paragraphIndex]) {{
+                    element.innerHTML = transcriptForSection[paragraphIndex];
+                }}
+            }});
+        }}
+    }});
+    
+    showingTranscript = !showingTranscript;
+    toggleBtn.textContent = showingTranscript ? 'Show Formatted' : 'Toggle Transcript';
 }});
 </script>'''
     
-    def _format_transcript_for_display(self, transcript_segments: List[Dict]) -> str:
-        """Format transcript segments for display with timestamps."""
-        if not transcript_segments:
-            return "<p>No transcript available.</p>"
-        
-        html_parts = []
-        current_section = None
-        current_time_range = None
-        
-        # Group segments into time-based sections (every 60 seconds)
-        section_duration = 60  # 1 minute sections
-        
-        for segment in transcript_segments:
-            segment_start = segment.get('start_time', segment.get('start', 0))
-            segment_text = segment.get('text', '')
-            
-            # Determine which section this segment belongs to
-            section_number = int(segment_start // section_duration) + 1
-            section_start_time = (section_number - 1) * section_duration
-            section_end_time = section_number * section_duration
-            
-            # Start new section if needed
-            if section_number != current_section:
-                if current_section is not None:
-                    html_parts.append('</div>')  # Close previous section
-                
-                html_parts.append(f'''<div class="transcript-section" style="margin-bottom: 30px; padding: 20px; background: #f8f9fa; border-left: 4px solid #667eea; border-radius: 4px;">
-    <h3 style="margin-top: 0; color: #333;">📝 Transcript: {self._format_time(section_start_time)} - {self._format_time(section_end_time)}</h3>''')
-                current_section = section_number
-            
-            # Add segment with timestamp
-            formatted_time = self._format_time(segment_start)
-            html_parts.append(f'''<p style="line-height: 1.6; margin-bottom: 15px;">
-    <span style="color: #667eea; font-weight: bold; font-size: 0.9em;">[{formatted_time}]</span> 
-    {segment_text}
-</p>''')
-        
-        # Close last section
-        if current_section is not None:
-            html_parts.append('</div>')
-        
-        return '\n'.join(html_parts)
     
     def _format_time(self, seconds: float) -> str:
         """Format seconds into MM:SS format."""
         minutes = int(seconds // 60)
         secs = int(seconds % 60)
         return f"{minutes:02d}:{secs:02d}"
+    
+    def _prepare_transcript_data_for_sections(self, transcript_segments: List[Dict]) -> List[List[str]]:
+        """Prepare transcript data organized by sections for the toggle functionality."""
+        if not transcript_segments:
+            return []
+        
+        # Get the current session's section information if available
+        # This is a bit of a hack, but we need to match transcript to the sections
+        # For now, we'll create reasonable sections based on time ranges
+        
+        # Calculate reasonable section breaks (every 60-90 seconds)
+        total_duration = max(segment.get('end_time', segment.get('end', 0)) for segment in transcript_segments)
+        target_sections = max(5, min(8, int(total_duration / 75)))  # 5-8 sections, ~75 seconds each
+        section_duration = total_duration / target_sections
+        
+        sections = []
+        
+        for section_index in range(target_sections):
+            section_start = section_index * section_duration
+            section_end = (section_index + 1) * section_duration
+            
+            # Get transcript segments for this section
+            section_segments = []
+            for segment in transcript_segments:
+                segment_start = segment.get('start_time', segment.get('start', 0))
+                segment_end = segment.get('end_time', segment.get('end', 0))
+                
+                # Include segment if it overlaps with this section
+                if (segment_start < section_end and segment_end > section_start):
+                    section_segments.append(segment.get('text', ''))
+            
+            # Group segments into paragraphs (every 3-4 segments or when total length > 300 chars)
+            paragraphs = []
+            current_paragraph = []
+            current_length = 0
+            
+            for segment_text in section_segments:
+                current_paragraph.append(segment_text.strip())
+                current_length += len(segment_text)
+                
+                # End paragraph if we have enough content or enough segments
+                if (len(current_paragraph) >= 3 and current_length > 200) or current_length > 400:
+                    if current_paragraph:
+                        paragraphs.append(' '.join(current_paragraph))
+                        current_paragraph = []
+                        current_length = 0
+            
+            # Add remaining content as final paragraph
+            if current_paragraph:
+                paragraphs.append(' '.join(current_paragraph))
+            
+            # Ensure we have at least one paragraph per section
+            if not paragraphs and section_segments:
+                paragraphs.append(' '.join(section_segments))
+            
+            sections.append(paragraphs)
+        
+        return sections
     
     def generate_blog_post(
         self, 
