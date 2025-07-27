@@ -802,6 +802,13 @@
             const rawTranscript = document.getElementById(`raw-transcript-${sectionIndex}`);
             const formattedContent = document.getElementById(`formatted-content-${sectionIndex}`);
             
+            // Safety checks to prevent errors
+            if (!checkbox || !rawTranscript || !formattedContent) {
+                console.error(`Toggle elements not found for section ${sectionIndex}`);
+                return;
+            }
+            
+            // Force checkbox state to be consistent with what we're about to show
             if (checkbox.checked) {
                 // Show raw transcript, hide formatted
                 rawTranscript.style.display = 'block';
@@ -811,7 +818,7 @@
                 const section = sessionData.sections[sectionIndex];
                 const transcriptText = document.getElementById(`transcript-text-${sectionIndex}`);
                 
-                if (transcriptText.textContent === 'Loading transcript...') {
+                if (transcriptText && transcriptText.textContent === 'Loading transcript...') {
                     // Find transcript segments for this section's time range
                     const sectionTranscripts = sessionData.transcript_segments.filter(segment => 
                         segment.start_time >= section.start_time && segment.end_time <= section.end_time
@@ -831,6 +838,16 @@
                 rawTranscript.style.display = 'none';
                 formattedContent.style.display = 'block';
             }
+            
+            // Force a small delay to ensure DOM has updated
+            setTimeout(() => {
+                // Double-check the state consistency
+                const isTranscriptVisible = rawTranscript.style.display === 'block';
+                if (checkbox.checked !== isTranscriptVisible) {
+                    console.warn(`State mismatch detected for section ${sectionIndex}, correcting...`);
+                    checkbox.checked = isTranscriptVisible;
+                }
+            }, 10);
         }
         
         function updateSelectionSummary() {

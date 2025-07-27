@@ -324,8 +324,20 @@ class HybridBlogCreator:
             # Redistribute zero-timestamp sections evenly
             section_duration = remaining_duration / len(zero_timestamp_sections)
             for i, zero_idx in enumerate(zero_timestamp_sections):
-                if i > 0:  # Keep first section at 0
-                    new_timestamp = last_real_timestamp + (i * section_duration)
+                if i == 0:
+                    # Ensure first section always starts at 0
+                    new_timestamp = 0.0
+                    old_title, old_ts = section_timestamps[zero_idx]
+                    section_timestamps[zero_idx] = (old_title, new_timestamp)
+                    logger.info(f"📍 First section '{old_title}' kept at 0s")
+                else:
+                    # Distribute remaining sections starting from the appropriate offset
+                    if last_real_timestamp > 0:
+                        # If we have real timestamps, start after them
+                        new_timestamp = last_real_timestamp + (i * section_duration)
+                    else:
+                        # If all sections were at 0, distribute evenly from the start
+                        new_timestamp = i * section_duration
                     old_title, old_ts = section_timestamps[zero_idx]
                     section_timestamps[zero_idx] = (old_title, new_timestamp)
                     logger.info(f"📍 Redistributed '{old_title}': 0s -> {new_timestamp:.1f}s")

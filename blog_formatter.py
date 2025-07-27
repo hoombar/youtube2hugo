@@ -256,6 +256,13 @@ CONVERSATIONAL TONE REQUIREMENTS:
 - **CASUAL BUT INFORMATIVE**: Balance friendly tone with technical accuracy
 - **RELATABLE EXPLANATIONS**: Use "you might be wondering", "here's what I've found works best"
 
+CRITICAL WORD VARIETY REQUIREMENTS:
+- **AVOID REPETITIVE FILLER WORDS**: Never use the same filler word (basically, essentially, actually, really, definitely, generally, typically, obviously, clearly, simply) more than 2-3 times in the entire blog post
+- **USE DIVERSE TRANSITIONS**: Instead of repeating "basically" 8 times, use varied alternatives like: "in essence", "fundamentally", "at its core", "put simply", "the key point is", "what this means is", "in practical terms", "the bottom line is"
+- **ELIMINATE REDUNDANT QUALIFIERS**: Remove unnecessary words that don't add meaning - instead of "basically very important" use "crucial" or "essential"
+- **VARY SENTENCE STARTERS**: Don't begin multiple sentences with the same word or phrase
+- **USE SPECIFIC LANGUAGE**: Replace vague terms with precise descriptions when possible
+
 TONE TRANSFORMATION EXAMPLES:
 BEFORE: "Even with the best coordinator, its physical placement is more critical than often perceived. Further details on placement will be discussed later. If a USB coordinator is in use, it is imperative to utilize a USB extension cable."
 AFTER: "Even if you've got the best coordinator money can buy, where you place it might be more important than you think. I'll get into the specifics shortly, but if you're using a USB coordinator, you'll definitely want to use a shielded USB extension cable!"
@@ -265,6 +272,11 @@ AFTER: "You'll want to think carefully about this setting since it can really im
 
 BEFORE: "The interface displays the current status of connected devices."
 AFTER: "You can see all your connected devices right here in the interface."
+
+WORD VARIETY TRANSFORMATION EXAMPLES:
+BEFORE (REPETITIVE): "I basically took this prompt and said, 'Using the old logs, find this error.' It's basically going through and doing mapping so we can basically figure out what it looks like. We're basically going to get an artifact. I basically got a similar result, but basically only some very low severity errors. Claude is basically telling me this is not much of an issue."
+
+AFTER (VARIED): "I took this prompt and said, 'Using the old logs, find this error.' It's going through and doing mapping so we can figure out what it looks like. We're going to get an artifact. I got a similar result, but with only some very low severity errors. Claude is telling me this is not much of an issue - in essence, it's a fairly transient problem that happens during startup."
 
 FORMATTING IMPROVEMENTS (while preserving everything above):
 - Write in first person ("I recommend", "I'll explain") and second person ("you should", "you'll see")
@@ -1008,9 +1020,19 @@ Create a comprehensive reference guide that presents this technical information 
                     if not found_timestamp:
                         logger.warning(f"⚠️  No timestamp found for section: '{clean_title}'")
                         # Use a default timestamp based on position
-                        default_timestamp = len(boundary_map) * 60  # 60 seconds apart as default
+                        # Check if this looks like an introduction/title section that should start at 0
+                        title_keywords = ['introduction', 'elevate', 'getting started', 'overview', 'intro', 'debug', 'test', 'video', 'smart doorbell']
+                        is_intro_section = any(keyword in clean_title.lower() for keyword in title_keywords)
+                        
+                        if len(boundary_map) == 0 or is_intro_section:
+                            # This is the first section OR an intro section, it should start at 0
+                            default_timestamp = 0.0
+                            logger.warning(f"   Detected intro/first section, using timestamp: 0.0s")
+                        else:
+                            # Subsequent sections: 60 seconds apart from the start
+                            default_timestamp = len(boundary_map) * 60  # 60 seconds apart as default
+                            logger.warning(f"   Using default timestamp: {default_timestamp:.1f}s")
                         boundary_map[clean_title] = default_timestamp
-                        logger.warning(f"   Using default timestamp: {default_timestamp:.1f}s")
         
         # Clean all markers from content
         clean_content = re.sub(marker_pattern, '', content_with_markers)
