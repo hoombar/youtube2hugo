@@ -750,8 +750,11 @@
                 return;
             }
             
-            // Cache DOM queries by building a more specific selector
-            const paragraphContainer = document.querySelector(`.paragraph-section:nth-child(${paragraphIndex + 1})`);
+            // Find the specific paragraph container more reliably
+            const allParagraphContainers = document.querySelectorAll('.paragraph-section');
+            if (paragraphIndex >= allParagraphContainers.length) return;
+            
+            const paragraphContainer = allParagraphContainers[paragraphIndex];
             if (!paragraphContainer) return;
             
             // Process frames in smaller batches to prevent blocking
@@ -762,11 +765,16 @@
             
             // Use requestAnimationFrame for non-blocking processing
             requestAnimationFrame(() => {
-                for (let frameIndex = 0; frameIndex < frames.length; frameIndex++) {
+                let processedCount = 0;
+                const maxProcessingLimit = 100; // Process at most 100 frames per paragraph to prevent lockup
+                
+                for (let frameIndex = 0; frameIndex < frames.length && processedCount < maxProcessingLimit; frameIndex++) {
                     const frame = frames[frameIndex];
                     if (!frame || frame.timestamp < startTime || frame.timestamp > endTime) {
                         continue;
                     }
+                    
+                    processedCount++;
                     
                     // Use a more specific selector within the paragraph container
                     const frameElement = paragraphContainer.querySelector(`[onclick*="toggleFrameSelection(${sectionIndex}, ${frameIndex}"]`);
@@ -781,6 +789,10 @@
                             frameElement.style.pointerEvents = 'auto';
                         }
                     }
+                }
+                
+                if (processedCount >= maxProcessingLimit) {
+                    console.warn(`Frame processing limit reached for paragraph ${paragraphIndex}, processed ${processedCount} frames`);
                 }
             });
         }
@@ -944,11 +956,7 @@
             resultDiv.style.display = 'block';
             
             resultDiv.innerHTML = `
-                <h3>🎉 Blog Post Generated Successfully!</h3>
-                <p><strong>✅ Status:</strong> Your blog post has been created and is ready for publication!</p>
-                <p><strong>📁 Output Location:</strong> <code>${result.output_file}</code></p>
-                <p><strong>🖼️ Images Used:</strong> ${result.frames_used} selected frames</p>
-                <p><strong>💡 Next Steps:</strong> Check your Hugo content directory for the generated blog post files.</p>
+                <h3>🎉 Blog post generated successfully</h3>
             `;
         }
         
