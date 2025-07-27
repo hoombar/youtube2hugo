@@ -945,9 +945,10 @@
             
             resultDiv.innerHTML = `
                 <h3>🎉 Blog Post Generated Successfully!</h3>
-                <p><strong>Output File:</strong> <a href="${result.output_file}" target="_blank">${result.output_file}</a></p>
-                <p><strong>Frames Used:</strong> ${result.frames_used}</p>
-                <p><strong>Status:</strong> Your blog post is ready for publication!</p>
+                <p><strong>✅ Status:</strong> Your blog post has been created and is ready for publication!</p>
+                <p><strong>📁 Output Location:</strong> <code>${result.output_file}</code></p>
+                <p><strong>🖼️ Images Used:</strong> ${result.frames_used} selected frames</p>
+                <p><strong>💡 Next Steps:</strong> Check your Hugo content directory for the generated blog post files.</p>
             `;
         }
         
