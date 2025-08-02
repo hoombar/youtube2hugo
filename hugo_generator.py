@@ -61,13 +61,19 @@ class HugoGenerator:
     margin: 0;
 }
 
-#modalImage {
-    width: 100%;
+#imageModal #modalImage,
+#imageModal .modal-content #modalImage,
+.post-content #imageModal #modalImage {
+    width: auto;
     height: auto;
-    max-height: 90vh;
+    max-height: 92vh;
+    max-width: 95vw;
+    min-width: 80vw;
+    min-height: 60vh;
     object-fit: contain;
     border-radius: 8px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    display: block;
 }
 
 #modalCaption {
@@ -93,12 +99,18 @@ class HugoGenerator:
 /* Mobile optimizations */
 @media (max-width: 768px) {
     #imageModal .modal-content {
-        max-width: 99%;
-        max-height: 98%;
+        max-width: 100%;
+        max-height: 100%;
+        padding: 5px;
     }
     
-    #modalImage {
+    #imageModal #modalImage,
+    #imageModal .modal-content #modalImage,
+    .post-content #imageModal #modalImage {
         max-height: 95vh;
+        max-width: 98vw;
+        min-width: 90vw;
+        min-height: 70vh;
         border-radius: 4px;
     }
     
@@ -119,10 +131,16 @@ class HugoGenerator:
     #imageModal .modal-content {
         max-width: 100%;
         max-height: 100%;
+        padding: 2px;
     }
     
-    #modalImage {
+    #imageModal #modalImage,
+    #imageModal .modal-content #modalImage,
+    .post-content #imageModal #modalImage {
         max-height: 98vh;
+        max-width: 99vw;
+        min-width: 95vw;
+        min-height: 80vh;
         border-radius: 2px;
     }
     
