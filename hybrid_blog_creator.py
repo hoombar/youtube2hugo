@@ -180,12 +180,27 @@ class HybridBlogCreator:
             
         except (SystemExit, ValueError) as e:
             logger.error(f"❌ AI processing failed ({type(e).__name__}: {e})")
-            if "safety filter" in str(e).lower() or "All prompting strategies failed" in str(e):
+
+            error_str = str(e).lower()
+
+            # Check if it's an API key or quota error
+            if "api key" in error_str or "quota" in error_str or "permission" in error_str:
+                logger.error(f"🔑 API AUTHENTICATION ERROR: This is NOT a content issue!")
+                logger.error(f"💡 The problem is with your Gemini API key, not the video content")
+                logger.error(f"🔧 To fix:")
+                logger.error(f"   1. Check if your API key is valid and not revoked")
+                logger.error(f"   2. Generate a new key at https://aistudio.google.com/apikey")
+                logger.error(f"   3. Update config.local.yaml with the new key")
+                logger.error(f"🚨 The system will create basic sections but content will be transcript-like")
+            elif "safety filter" in error_str or "All prompting strategies failed" in error_str:
                 logger.error(f"🚨 GEMINI SAFETY FILTER: The video content triggered Gemini's safety filters")
                 logger.error(f"💡 Multiple prompting strategies were attempted but all were blocked")
                 logger.error(f"📝 This is usually due to technical content being misidentified as potentially harmful")
                 logger.error(f"🔧 The system will create basic sections but content will be transcript-like")
                 logger.error(f"⚠️  Consider: 1) Using a different video, 2) Different AI service, 3) Manual editing")
+            else:
+                logger.error(f"❓ UNKNOWN ERROR: {e}")
+
             logger.error(f"⚠️  This failure should NOT be affected by processing_mode: {processing_mode}")
             logger.error(f"🚨 IMPORTANT: User will see transcript-like content instead of blog content!")
             try:
@@ -591,7 +606,7 @@ class HybridBlogCreator:
             'start_time': start_time,
             'end_time': end_time,
             'content': content,
-            'paragraphs': self._split_into_paragraphs(content, start_time, end_time)
+            'paragraphs': self._break_into_paragraphs(content, start_time, end_time)
         }
     
     def _generate_section_title(self, content: str, section_number: int) -> str:

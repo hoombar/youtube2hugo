@@ -1,0 +1,62 @@
+# YouTube to Hugo Configuration Template
+# Copy this file to config.local.yaml and fill in your values
+
+# LLM Provider Configuration
+# Groq is the default provider (free tier available with generous limits)
+llm:
+  provider: "groq"  # Options: "groq" (default, recommended) or "gemini"
+
+  # Groq Configuration (Recommended - Less aggressive safety filters)
+  groq:
+    api_key: ""  # Get your free API key at https://console.groq.com
+    model: "llama-3.1-70b-versatile"  # Options: llama-3.1-70b-versatile, llama-3.1-8b-instant, mixtral-8x7b-32768
+
+  # Gemini Configuration (Alternative - Google's AI)
+  gemini:
+    api_key: ""  # Get your free API key at https://aistudio.google.com/apikey
+    model: "gemini-2.5-flash"  # Options: gemini-2.5-flash, gemini-1.5-pro
+
+# Legacy format (still supported for backward compatibility)
+# groq:
+#   api_key: "your-groq-api-key-here"
+#   model: "llama-3.1-70b-versatile"
+#
+# gemini:
+#   api_key: "your-gemini-api-key-here"
+#   model: "gemini-2.5-flash"
+
+# Transcript settings
+transcript_settings:
+  whisper_model: "base"  # Options: tiny, base, small, medium, large
+
+# Output settings
+output:
+  base_folder: "content"
+  posts_folder: "posts"
+
+# Hugo settings
+hugo:
+  static_path: "static/images"
+  use_page_bundles: true  # Use Hugo page bundles (recommended)
+  use_shortcodes: true    # Use Hugo shortcodes for images
+
+# Template settings
+template:
+  path: "templates/default.md"  # Path to blog post template
+
+# Processing settings
+processing:
+  cleanup_temp_files: true
+  save_transcripts: true
+  default_whisper_model: "base"
+
+# Date settings
+date:
+  offset_days: 0  # Offset for post dates (0 = current date)
+
+# Technical terms (for transcript correction)
+technical_terms:
+  # Add custom terms that Whisper commonly mishears
+  # Format: "Correct Term": ["mishearing1", "mishearing2"]
+  # Example:
+  # "Home Assistant": ["home assistant", "homeassistant"]

@@ -1,68 +1,163 @@
-# Local configuration file (copy to config.local.yaml and customize)
-# This file contains sensitive settings and should NOT be committed to git
+# YouTube to Hugo - Local Configuration Example
+# Copy this file to config.local.yaml and customize with your settings
+# IMPORTANT: config.local.yaml should NOT be committed to git (contains API keys)
 
-# Gemini API configuration
-gemini:
-  api_key: "your-google-api-key-here"
-  model: "gemini-2.5-flash"
-  max_retries: 3                # Number of interactive retries for API failures
-  timeout_seconds: 60           # Timeout for individual API calls
+# =============================================================================
+# LLM Provider Configuration (NEW - Choose Your AI Provider)
+# =============================================================================
 
-# Output configuration
+# Recommended: Use Groq (free, fast, less aggressive safety filters)
+llm:
+  provider: "groq"  # Options: "groq" (recommended) or "gemini"
+
+  # Groq Configuration (Recommended - Better for technical content)
+  groq:
+    api_key: "gsk_your_groq_api_key_here"  # Get free key at https://console.groq.com
+    model: "llama-3.1-70b-versatile"  # Options: llama-3.1-70b-versatile, llama-3.1-8b-instant, mixtral-8x7b-32768
+
+  # Gemini Configuration (Alternative - Google's AI)
+  gemini:
+    api_key: "your_gemini_api_key_here"  # Get free key at https://aistudio.google.com/apikey
+    model: "gemini-2.5-flash"  # Options: gemini-2.5-flash, gemini-1.5-pro
+    max_retries: 3  # Number of retries for API failures
+    timeout_seconds: 60  # Timeout for API calls
+
+# NOTE: You can also use environment variables:
+#   export GROQ_API_KEY="gsk_your_key_here"
+#   export GROQ_MODEL="llama-3.1-70b-versatile"
+#   export GEMINI_API_KEY="your_key_here"
+#   export LLM_PROVIDER="groq"
+
+# =============================================================================
+# Legacy Format (Still Supported - for backward compatibility)
+# =============================================================================
+
+# If you prefer the old format, this still works:
+# groq:
+#   api_key: "gsk_your_key_here"
+#   model: "llama-3.1-70b-versatile"
+#
+# gemini:
+#   api_key: "your_gemini_api_key_here"
+#   model: "gemini-2.5-flash"
+
+# =============================================================================
+# Output Configuration
+# =============================================================================
+
 output:
-  base_folder: "/path/to/your/hugo/site"
-  posts_folder: "content/posts"  # Relative to base_folder
-  
-# Template configuration
+  base_folder: "/path/to/your/hugo/site"  # Full path to your Hugo site
+  posts_folder: "content/posts"  # Relative path within Hugo site
+
+# =============================================================================
+# Template Configuration
+# =============================================================================
+
 template:
   path: "/path/to/your/custom/template.md"  # Optional: custom blog post template
-  
-# Hugo configuration
+  # If not specified, uses built-in template
+
+# =============================================================================
+# Hugo Configuration
+# =============================================================================
+
 hugo:
-  static_path: "static/images"
-  use_page_bundles: true
-  use_shortcodes: false  # Set to true if you see "raw HTML omitted" in your blog
-  date_offset_days: 1  # Days ago to set post date (avoids Hugo future date issues)
-  
-# IMPORTANT: If you see "raw HTML omitted" in your blog posts, you have two options:
-# Option 1 (Recommended): Enable HTML rendering in your Hugo config.yaml:
+  static_path: "static/images"  # Where to store images
+  use_page_bundles: true  # Use Hugo page bundles (recommended)
+  use_shortcodes: false  # Use Hugo shortcodes for images (see note below)
+  date_offset_days: 1  # Days in past to set post date (avoids Hugo future date issues)
+
+# IMPORTANT: If you see "raw HTML omitted" in your blog posts:
+# Option 1 (Recommended): Enable HTML in your Hugo config.yaml:
 #   markup:
 #     goldmark:
 #       renderer:
 #         unsafe: true
-# 
+#
 # Option 2: Set use_shortcodes: true above and create Hugo shortcodes (see README)
-  
-# Image grid layout configuration
+
+# =============================================================================
+# Image Grid Layout Configuration
+# =============================================================================
+
 image_grid:
-  show_timestamps: true      # Show timestamp captions on grid images
-  gap_size: "10px"          # Space between grid images
-  border_radius: "4px"      # Rounded corners for images
-  max_columns: 3            # Maximum columns in flexible grid layouts
-  include_css_reset: true   # Include CSS reset to override theme interference
-  use_flexbox_fallback: false  # Use flexbox instead of CSS Grid (for problematic themes)
+  show_timestamps: true  # Display timestamp captions on images
+  gap_size: "10px"  # Space between grid images
+  border_radius: "4px"  # Rounded corners for images
+  max_columns: 3  # Maximum columns in flexible grid layouts
+  include_css_reset: true  # Override theme CSS interference
+  use_flexbox_fallback: false  # Use flexbox instead of CSS Grid (for older themes)
 
-# Processing configuration
+# =============================================================================
+# Processing Configuration
+# =============================================================================
+
 processing:
-  cleanup_temp_files: true
-  save_transcripts: false
-  default_whisper_model: "base"
-  image_similarity_threshold: 0.85  # Remove images more than 85% similar (0.0=completely different, 1.0=identical)
-  
-# Date configuration
-date:
-  offset_days: 1  # Set post date this many days in the past (default: 1 to avoid Hugo future date issues)
+  cleanup_temp_files: true  # Delete temporary files after processing
+  save_transcripts: false  # Save transcript JSON files for debugging
+  default_whisper_model: "base"  # Whisper model: tiny, base, small, medium, large
+  image_similarity_threshold: 0.85  # Remove images more than 85% similar (0.0-1.0)
 
-# Technical terms correction for improved transcription accuracy
-# Add custom terms that are commonly misheard during speech-to-text
+# =============================================================================
+# Date Configuration
+# =============================================================================
+
+date:
+  offset_days: 1  # Set post date this many days in past (default: 1)
+  # Hugo won't publish posts dated in the future by default
+  # Setting this to 1 means posts are dated yesterday
+
+# =============================================================================
+# Technical Terms Correction (Improves Transcription Accuracy)
+# =============================================================================
+
+# Add custom terms that Whisper commonly mishears during speech-to-text
+# Format: "Correct Term": ["mishearing1", "mishearing2", ...]
+
 technical_terms:
-  # Example: Correct term followed by list of common mishearings
+  # Examples - add your own product/company names:
   "Your Product Name":
     - "your product name"
-    - "you're product name" 
+    - "you're product name"
     - "Your-Product-Name"
+
   "Custom Company":
     - "custom company"
     - "Custom-Company"
     - "customcompany"
+
   # The system already includes comprehensive Home Assistant/smart home terms
+  # See blog_formatter.py for the full list of built-in corrections
+
+# =============================================================================
+# Quick Start Guide
+# =============================================================================
+
+# 1. Copy this file: cp config.local.yaml.example config.local.yaml
+# 2. Get a free Groq API key: https://console.groq.com (recommended)
+#    OR get Gemini API key: https://aistudio.google.com/apikey
+# 3. Update the API key in the llm section above
+# 4. Set your Hugo site path in output.base_folder
+# 5. Run: python hybrid_blog_creator.py
+# 6. Visit: http://127.0.0.1:5002
+# 7. Process your video and select frames!
+
+# =============================================================================
+# Troubleshooting
+# =============================================================================
+
+# Issue: "API key was reported as leaked"
+# Solution: Your API key is compromised. Generate a new one and update config.
+
+# Issue: "Content blocked by safety filters"
+# Solution: Switch from Gemini to Groq (set llm.provider: "groq")
+#           Groq has less aggressive safety filters for technical content.
+
+# Issue: "Raw HTML omitted" in blog
+# Solution: Enable unsafe HTML in Hugo config (see hugo section above)
+
+# Issue: Whisper transcription is slow
+# Solution: Use smaller model (tiny or base) in processing.default_whisper_model
+
+# Issue: Too many/few frames extracted
+# Solution: Adjust processing.image_similarity_threshold (higher=fewer frames)

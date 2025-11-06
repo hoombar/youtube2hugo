@@ -1,4 +1,4 @@
-"""Transcript extraction module using Whisper and Gemini API for cleanup."""
+"""Transcript extraction module using Whisper and LLM APIs (Groq/Gemini) for cleanup."""
 
 import os
 import tempfile
@@ -8,6 +8,13 @@ from typing import List, Dict, Optional
 import logging
 import google.generativeai as genai
 import json
+
+# Import Groq formatter
+try:
+    from groq_formatter import GroqFormatter
+    GROQ_AVAILABLE = True
+except ImportError:
+    GROQ_AVAILABLE = False
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -19,19 +26,44 @@ class TranscriptExtractor:
         self.config = config
         self.whisper_model = None
         self.gemini_client = None
-        
-        # Initialize Gemini client if API key is provided
-        api_key = (config.get('gemini_api_key') or 
-                  config.get('gemini', {}).get('api_key') or 
-                  os.getenv('GOOGLE_API_KEY'))
-        if api_key:
-            genai.configure(api_key=api_key)
-            model_name = (config.get('gemini_model') or 
-                         config.get('gemini', {}).get('model', 'gemini-2.5-flash'))
-            self.gemini_client = genai.GenerativeModel(model_name)
-            logger.info(f"Gemini API client initialized for transcript cleanup with model: {model_name}")
-        else:
-            logger.warning("No Gemini API key found. Transcript cleanup will be skipped.")
+        self.groq_client = None
+        self.provider = None
+
+        # Determine which LLM provider to use
+        provider = (
+            config.get('llm_provider') or
+            config.get('llm', {}).get('provider') or
+            os.getenv('LLM_PROVIDER') or
+            'groq'  # Default to Groq
+        ).lower()
+
+        # Try to initialize the selected provider
+        if provider == 'groq' and GROQ_AVAILABLE:
+            try:
+                self.groq_client = GroqFormatter(config)
+                if self.groq_client.client:
+                    self.provider = 'groq'
+                    logger.info(f"Transcript extractor using Groq with model: {self.groq_client.model}")
+                else:
+                    provider = 'gemini'  # Fall back to Gemini
+            except Exception as e:
+                logger.warning(f"Could not initialize Groq client: {e}. Falling back to Gemini")
+                provider = 'gemini'
+
+        # Initialize Gemini as fallback or if explicitly selected
+        if provider == 'gemini' or self.provider is None:
+            api_key = (config.get('gemini_api_key') or
+                      config.get('gemini', {}).get('api_key') or
+                      os.getenv('GOOGLE_API_KEY'))
+            if api_key:
+                genai.configure(api_key=api_key)
+                model_name = (config.get('gemini_model') or
+                             config.get('gemini', {}).get('model', 'gemini-2.5-flash'))
+                self.gemini_client = genai.GenerativeModel(model_name)
+                self.provider = 'gemini'
+                logger.info(f"Transcript extractor using Gemini with model: {model_name}")
+            else:
+                logger.warning("No LLM provider configured. Transcript cleanup will be skipped.")
     
     def extract_transcript(self, video_path: str) -> List[Dict]:
         """Extract transcript from video using Whisper."""

@@ -1,10 +1,19 @@
-"""Blog post formatting module using Gemini API for content enhancement."""
+"""Blog post formatting module using LLM APIs (Groq/Gemini) for content enhancement."""
 
 import os
 import re
 from typing import List, Dict, Optional
 import google.generativeai as genai
+from google.api_core import exceptions as google_exceptions
 import logging
+
+# Import Groq formatter
+try:
+    from groq_formatter import GroqFormatter
+    GROQ_AVAILABLE = True
+except ImportError:
+    GROQ_AVAILABLE = False
+    logger.warning("Groq formatter not available. Install groq package for Groq support.")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -49,22 +58,116 @@ class BlogFormatter:
     def __init__(self, config: Dict):
         self.config = config
         self.gemini_client = None
-        
+        self.groq_client = None
+        self.provider = None
+
         # Load technical terms for correction
         self.technical_terms = self._load_technical_terms()
-        
-        # Initialize Gemini client if API key is provided
-        api_key = (config.get('gemini_api_key') or 
-                  config.get('gemini', {}).get('api_key') or 
-                  os.getenv('GOOGLE_API_KEY'))
-        if api_key:
-            genai.configure(api_key=api_key)
-            model_name = (config.get('gemini_model') or 
-                         config.get('gemini', {}).get('model', 'gemini-2.5-flash'))
-            self.gemini_client = genai.GenerativeModel(model_name)
-            logger.info(f"Gemini API client initialized for blog formatting with model: {model_name}")
+
+        # Determine which LLM provider to use
+        # Priority: explicit config > environment variables > auto-detect based on API keys
+        provider = (
+            config.get('llm_provider') or
+            config.get('llm', {}).get('provider') or
+            os.getenv('LLM_PROVIDER') or
+            'groq'  # Default to Groq
+        ).lower()
+
+        # Try to initialize the selected provider
+        if provider == 'groq' and GROQ_AVAILABLE:
+            try:
+                self.groq_client = GroqFormatter(config)
+                if self.groq_client.client:  # Check if Groq client initialized successfully
+                    self.provider = 'groq'
+                    logger.info(f"✅ Using Groq as LLM provider with model: {self.groq_client.model}")
+                else:
+                    logger.warning("Groq client initialization failed, falling back to Gemini")
+                    provider = 'gemini'  # Fall back to Gemini
+            except Exception as e:
+                logger.warning(f"Could not initialize Groq client: {e}. Falling back to Gemini")
+                provider = 'gemini'
+
+        # Initialize Gemini as fallback or if explicitly selected
+        if provider == 'gemini' or self.provider is None:
+            api_key = (config.get('gemini_api_key') or
+                      config.get('gemini', {}).get('api_key') or
+                      os.getenv('GOOGLE_API_KEY'))
+            if api_key:
+                genai.configure(api_key=api_key)
+                model_name = (config.get('gemini_model') or
+                             config.get('gemini', {}).get('model', 'gemini-2.5-flash'))
+                self.gemini_client = genai.GenerativeModel(model_name)
+                self.provider = 'gemini'
+                logger.info(f"✅ Using Gemini as LLM provider with model: {model_name}")
+            else:
+                if self.provider is None:
+                    logger.error("❌ No LLM provider available! Please configure either Groq or Gemini API key.")
+                    logger.error("   - For Groq (free): Get API key at https://console.groq.com")
+                    logger.error("   - For Gemini (free): Get API key at https://aistudio.google.com/apikey")
+
+    def _generate_content(self, prompt: str, max_tokens: int = 8000, temperature: float = 0.2):
+        """Unified method to generate content using the configured LLM provider.
+
+        Args:
+            prompt: The prompt to send to the LLM
+            max_tokens: Maximum tokens in response
+            temperature: Sampling temperature
+
+        Returns:
+            Response object with .text attribute and .candidates for compatibility
+
+        Raises:
+            ValueError: If no provider is available or API call fails
+        """
+        if self.provider == 'groq' and self.groq_client:
+            # Use Groq
+            return self.groq_client.generate_content(prompt, max_tokens=max_tokens, temperature=temperature)
+        elif self.provider == 'gemini' and self.gemini_client:
+            # Use Gemini
+            return self.gemini_client.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=max_tokens,
+                    temperature=temperature,
+                )
+            )
         else:
-            logger.warning("No Gemini API key found. Blog formatting will be skipped.")
+            raise ValueError(
+                "No LLM provider available. Please configure either Groq or Gemini API key."
+            )
+
+    def _handle_api_call(self, api_call_func, error_context: str = "API call"):
+        """Wrapper to handle API calls with proper error differentiation."""
+        try:
+            return api_call_func()
+        except google_exceptions.PermissionDenied as e:
+            logger.error(f"🔑 API KEY ERROR: {e}")
+            logger.error("❌ Your Gemini API key is invalid, revoked, or has been flagged as leaked")
+            logger.error("💡 To fix this:")
+            logger.error("   1. Go to https://aistudio.google.com/apikey")
+            logger.error("   2. Generate a new API key")
+            logger.error("   3. Update your config.local.yaml file with the new key")
+            logger.error("   4. Never commit your API key to version control")
+            raise ValueError(f"Invalid or revoked Gemini API key. Please generate a new key and update your config.")
+        except google_exceptions.ResourceExhausted as e:
+            logger.error(f"📊 QUOTA ERROR: {e}")
+            logger.error("❌ Gemini API quota has been exceeded")
+            logger.error("💡 Wait a few minutes and try again, or check your quota at https://aistudio.google.com/")
+            raise ValueError(f"Gemini API quota exceeded. Please wait and try again later.")
+        except google_exceptions.InvalidArgument as e:
+            logger.error(f"❌ INVALID REQUEST: {e}")
+            raise ValueError(f"Invalid API request: {e}")
+        except Exception as e:
+            # Check if this is a finish_reason issue (content safety filter)
+            error_str = str(e).lower()
+            if "finish_reason" in error_str or "safety" in error_str or "blocked" in error_str:
+                logger.error(f"🛡️ CONTENT SAFETY FILTER: {e}")
+                logger.error("❌ The content was blocked by safety filters")
+                raise SystemExit(f"Content blocked by safety filters: {e}")
+            else:
+                # Unknown error
+                logger.error(f"❌ {error_context} failed: {e}")
+                raise
     
     def format_content_with_images(
         self, 
@@ -74,8 +177,8 @@ class BlogFormatter:
     ) -> str:
         """Format content with two-pass Claude processing while preserving image positions."""
         
-        if not self.gemini_client:
-            error_msg = "Gemini API key is required for blog formatting. Please set GOOGLE_API_KEY environment variable or configure gemini.api_key in config."
+        if not self.provider:
+            error_msg = "LLM provider is required for blog formatting. Please configure either Groq or Gemini API key."
             logger.error(error_msg)
             raise ValueError(error_msg)
         
@@ -117,8 +220,8 @@ class BlogFormatter:
     def format_transcript_content(self, transcript_segments: List[Dict], title: str) -> str:
         """Format raw transcript segments into structured blog content without images."""
         
-        if not self.gemini_client:
-            error_msg = "Gemini API key is required for blog formatting. Please set GOOGLE_API_KEY environment variable or configure gemini.api_key in config."
+        if not self.provider:
+            error_msg = "LLM provider is required for blog formatting. Please configure either Groq or Gemini API key."
             logger.error(error_msg)
             raise ValueError(error_msg)
         
@@ -141,31 +244,49 @@ class BlogFormatter:
         for strategy_name, format_function in strategies:
             try:
                 logger.info(f"🔄 Trying {strategy_name} prompting strategy...")
-                formatted_content_with_markers = format_function(corrected_content, title)
-                
+
+                # Use error handler wrapper for API calls
+                def api_call():
+                    return format_function(corrected_content, title)
+
+                formatted_content_with_markers = self._handle_api_call(
+                    api_call,
+                    error_context=f"{strategy_name} strategy formatting"
+                )
+
                 # Check if we got valid content
                 if not formatted_content_with_markers or len(formatted_content_with_markers.strip()) < 100:
                     logger.warning(f"❌ {strategy_name} strategy returned insufficient content")
                     continue
-                
+
                 # Extract and store boundary information, then clean content
                 formatted_content, boundary_map = self._extract_and_clean_boundaries(formatted_content_with_markers)
-                
+
                 # Store boundary map for later use in frame selection
                 self.boundary_map = boundary_map
-                
+
                 # Validate blog structure
                 if not self._validate_blog_structure(formatted_content):
                     logger.warning(f"❌ {strategy_name} strategy failed structure validation")
                     continue
-                
+
                 logger.info(f"✅ {strategy_name} strategy succeeded! Generated {len(self._extract_headers(formatted_content))} sections")
                 return formatted_content
-                
+
             except SystemExit as e:
                 # Safety filter blocked - try next strategy
                 logger.warning(f"❌ {strategy_name} strategy blocked by safety filter: {e}")
                 continue
+            except ValueError as e:
+                # API key or quota error - these won't be fixed by trying different strategies
+                error_str = str(e).lower()
+                if "api key" in error_str or "quota" in error_str:
+                    logger.error(f"❌ {strategy_name} strategy failed due to API authentication/quota issue")
+                    logger.error(f"🛑 No point trying other strategies - this is not a content issue")
+                    raise  # Re-raise to stop trying other strategies
+                else:
+                    logger.warning(f"❌ {strategy_name} strategy failed: {e}")
+                    continue
             except Exception as e:
                 logger.warning(f"❌ {strategy_name} strategy failed: {e}")
                 continue
@@ -181,15 +302,9 @@ class BlogFormatter:
         
         try:
             full_prompt = f"{prompt}\n\nContent to format:\n{content}"
-            
-            response = self.gemini_client.generate_content(
-                full_prompt,
-                generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=8000,
-                    temperature=0.2,  # Lower temperature for more consistent preservation
-                )
-            )
-            
+
+            response = self._generate_content(full_prompt, max_tokens=8000, temperature=0.2)
+
             formatted_content = self._safe_extract_response_text(response)
             
             logger.info("Blog post formatting completed successfully")
@@ -353,8 +468,8 @@ Return the complete formatted blog post content (no front matter). Must contain 
     
     def enhance_transcript_segments(self, segments: List[Dict]) -> List[Dict]:
         """First pass: Clean up transcript segments (called from transcript_extractor)."""
-        
-        if not self.gemini_client:
+
+        if not self.provider:
             return segments
         
         # Combine all text for processing
@@ -399,14 +514,8 @@ Return only the cleaned transcript text:
 {text}"""
         
         try:
-            response = self.gemini_client.generate_content(
-                cleanup_prompt,
-                generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=6000,
-                    temperature=0.1,
-                )
-            )
-            
+            response = self._generate_content(cleanup_prompt, max_tokens=6000, temperature=0.1)
+
             cleaned_text = self._safe_extract_response_text(response)
             logger.info("First pass transcript cleanup completed")
             return cleaned_text
@@ -625,13 +734,7 @@ Content to transform:
 CRITICAL: Your output MUST start with "## Introduction" and end with "## Conclusion"."""
         
         try:
-            response = self.gemini_client.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=8000,
-                    temperature=0.1,  # Very low temperature for consistent structure
-                )
-            )
+            response = self._generate_content(prompt, max_tokens=8000, temperature=0.1)
             return self._safe_extract_response_text(response)
         except Exception as e:
             logger.error(f"Error in strict blog formatting: {e}")
@@ -678,13 +781,7 @@ Transform this content:
 Output a simple, well-structured blog post following the exact format above."""
         
         try:
-            response = self.gemini_client.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=6000,
-                    temperature=0.0,  # Zero temperature for maximum consistency
-                )
-            )
+            response = self._generate_content(prompt, max_tokens=6000, temperature=0.0)
             return self._safe_extract_response_text(response)
         except Exception as e:
             logger.error(f"Error in ultra-strict blog formatting: {e}")
@@ -796,13 +893,7 @@ Transform this into a professional, well-structured blog post that reads like ex
 """
         
         try:
-            response = self.gemini_client.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=8000,
-                    temperature=0.1,
-                )
-            )
+            response = self._generate_content(prompt, max_tokens=8000, temperature=0.1)
             return self._safe_extract_response_text(response)
         except Exception as e:
             logger.error(f"Error in boundary-preserving blog formatting: {e}")
@@ -840,13 +931,7 @@ Output: Professional blog post with ALL timestamp markers preserved and transcri
 """
         
         try:
-            response = self.gemini_client.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=8000,
-                    temperature=0.0,
-                )
-            )
+            response = self._generate_content(prompt, max_tokens=8000, temperature=0.0)
             return self._safe_extract_response_text(response)
         except Exception as e:
             logger.error(f"Error in strict boundary-preserving blog formatting: {e}")
@@ -881,13 +966,7 @@ Transform this into a clear, educational article that teaches these technology c
 """
         
         try:
-            response = self.gemini_client.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=8000,
-                    temperature=0.2,
-                )
-            )
+            response = self._generate_content(prompt, max_tokens=8000, temperature=0.2)
             return self._safe_extract_response_text(response)
         except Exception as e:
             logger.error(f"Error in educational blog formatting: {e}")
@@ -922,13 +1001,7 @@ Create a comprehensive tutorial that guides users through these technical proced
 """
         
         try:
-            response = self.gemini_client.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=8000,
-                    temperature=0.1,
-                )
-            )
+            response = self._generate_content(prompt, max_tokens=8000, temperature=0.1)
             return self._safe_extract_response_text(response)
         except Exception as e:
             logger.error(f"Error in tutorial blog formatting: {e}")
@@ -963,13 +1036,7 @@ Create a comprehensive reference guide that presents this technical information 
 """
         
         try:
-            response = self.gemini_client.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=8000,
-                    temperature=0.3,
-                )
-            )
+            response = self._generate_content(prompt, max_tokens=8000, temperature=0.3)
             return self._safe_extract_response_text(response)
         except Exception as e:
             logger.error(f"Error in guide blog formatting: {e}")

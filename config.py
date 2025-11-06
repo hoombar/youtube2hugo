@@ -24,7 +24,11 @@ class Config:
     # Transcript settings
     CONTEXT_WINDOW = 30  # seconds before/after frame for transcript context
     WHISPER_MODEL = "base"  # tiny, base, small, medium, large
-    GEMINI_MODEL = "gemini-2.5-flash"
+
+    # LLM Provider settings
+    LLM_PROVIDER = "groq"  # Default provider: "groq" or "gemini"
+    GROQ_MODEL = "llama-3.1-70b-versatile"  # Default Groq model
+    GEMINI_MODEL = "gemini-2.5-flash"  # Default Gemini model
     
     # Output settings
     DEFAULT_OUTPUT_DIR = "output"
@@ -56,14 +60,46 @@ class Config:
             # Flatten the nested structure for easier access
             flattened = {}
             
-            # Handle Gemini API configuration
+            # Handle LLM Provider configuration (new multi-provider format)
+            if 'llm' in local_config:
+                llm_config = local_config['llm']
+
+                # Get provider selection
+                if 'provider' in llm_config:
+                    flattened['llm_provider'] = llm_config['provider']
+
+                # Handle Groq configuration
+                if 'groq' in llm_config:
+                    groq_config = llm_config['groq']
+                    if 'api_key' in groq_config:
+                        flattened['groq_api_key'] = groq_config['api_key']
+                    if 'model' in groq_config:
+                        flattened['groq_model'] = groq_config['model']
+
+                # Handle Gemini configuration within llm block
+                if 'gemini' in llm_config:
+                    gemini_config = llm_config['gemini']
+                    if 'api_key' in gemini_config:
+                        flattened['gemini_api_key'] = gemini_config['api_key']
+                    if 'model' in gemini_config:
+                        flattened['gemini_model'] = gemini_config['model']
+
+            # Handle Groq API configuration (standalone format for backward compatibility)
+            if 'groq' in local_config:
+                groq_config = local_config['groq']
+                if 'api_key' in groq_config:
+                    flattened['groq_api_key'] = groq_config['api_key']
+                if 'model' in groq_config:
+                    flattened['groq_model'] = groq_config['model']
+
+            # Handle Gemini API configuration (legacy standalone format)
             if 'gemini' in local_config:
                 gemini_config = local_config['gemini']
                 if 'api_key' in gemini_config:
                     flattened['gemini_api_key'] = gemini_config['api_key']
                 if 'model' in gemini_config:
                     flattened['gemini_model'] = gemini_config['model']
-            
+
             # Legacy Claude configuration support (for backward compatibility)
             if 'claude' in local_config:
                 claude_config = local_config['claude']
@@ -142,6 +178,8 @@ class Config:
             'hugo_content_path': cls.HUGO_CONTENT_PATH,
             'context_window': cls.CONTEXT_WINDOW,
             'whisper_model': cls.WHISPER_MODEL,
+            'llm_provider': cls.LLM_PROVIDER,
+            'groq_model': cls.GROQ_MODEL,
             'gemini_model': cls.GEMINI_MODEL,
             'default_output_dir': cls.DEFAULT_OUTPUT_DIR
         }

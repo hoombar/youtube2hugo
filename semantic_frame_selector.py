@@ -1,5 +1,5 @@
 """
-Semantic-driven frame selection using Gemini for content analysis.
+Semantic-driven frame selection using LLM APIs (Groq/Gemini) for content analysis.
 
 This module analyzes transcript content to identify logical sections and visual cues,
 then selects frames based on semantic relevance rather than just temporal distribution.
@@ -7,11 +7,19 @@ then selects frames based on semantic relevance rather than just temporal distri
 
 import json
 import logging
+import os
 from typing import List, Dict, Optional, Tuple
 import google.generativeai as genai
 import cv2
 import numpy as np
 from PIL import Image
+
+# Import Groq formatter
+try:
+    from groq_formatter import GroqFormatter
+    GROQ_AVAILABLE = True
+except ImportError:
+    GROQ_AVAILABLE = False
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -30,16 +38,42 @@ class SemanticSectionAnalyzer:
     def __init__(self, config: Dict):
         self.config = config
         self.gemini_client = None
-        
-        # Initialize Gemini client
-        api_key = config.get('gemini_api_key') or config.get('gemini', {}).get('api_key')
-        if not api_key:
-            raise ValueError("Gemini API key required for semantic analysis")
-            
-        genai.configure(api_key=api_key)
-        model_name = config.get('gemini_model', 'gemini-2.5-flash')
-        self.gemini_client = genai.GenerativeModel(model_name)
-        logger.info(f"Semantic analyzer initialized with model: {model_name}")
+        self.groq_client = None
+        self.provider = None
+
+        # Determine which LLM provider to use
+        provider = (
+            config.get('llm_provider') or
+            config.get('llm', {}).get('provider') or
+            os.getenv('LLM_PROVIDER') or
+            'groq'  # Default to Groq
+        ).lower()
+
+        # Try to initialize the selected provider
+        if provider == 'groq' and GROQ_AVAILABLE:
+            try:
+                self.groq_client = GroqFormatter(config)
+                if self.groq_client.client:
+                    self.provider = 'groq'
+                    logger.info(f"✅ Semantic analyzer using Groq with model: {self.groq_client.model}")
+                else:
+                    provider = 'gemini'  # Fall back to Gemini
+            except Exception as e:
+                logger.warning(f"Could not initialize Groq client: {e}. Falling back to Gemini")
+                provider = 'gemini'
+
+        # Initialize Gemini as fallback or if explicitly selected
+        if provider == 'gemini' or self.provider is None:
+            api_key = config.get('gemini_api_key') or config.get('gemini', {}).get('api_key') or os.getenv('GOOGLE_API_KEY')
+            if api_key:
+                genai.configure(api_key=api_key)
+                model_name = config.get('gemini_model', 'gemini-2.5-flash')
+                self.gemini_client = genai.GenerativeModel(model_name)
+                self.provider = 'gemini'
+                logger.info(f"✅ Semantic analyzer using Gemini with model: {model_name}")
+            else:
+                if self.provider is None:
+                    raise ValueError("No LLM provider available for semantic analysis. Please configure either Groq or Gemini API key.")
     
     def analyze_transcript_sections(self, transcript_segments: List[Dict]) -> List[Dict]:
         """Analyze transcript to identify semantic sections with visual cues."""
@@ -147,25 +181,34 @@ Return ONLY the JSON response, no additional text.
         return prompt
     
     def _query_gemini_with_retry(self, prompt: str, max_retries: int = 3) -> str:
-        """Query Gemini with retry logic for rate limiting."""
-        
+        """Query LLM provider with retry logic for rate limiting."""
+
         for attempt in range(max_retries):
             try:
-                logger.info(f"🤖 Querying Gemini (attempt {attempt + 1}/{max_retries})...")
-                response = self.gemini_client.generate_content(prompt)
-                
+                provider_name = self.provider.upper() if self.provider else "LLM"
+                logger.info(f"🤖 Querying {provider_name} (attempt {attempt + 1}/{max_retries})...")
+
+                # Call the appropriate provider
+                if self.provider == 'groq' and self.groq_client:
+                    response = self.groq_client.generate_content(prompt, max_tokens=4000, temperature=0.1)
+                elif self.provider == 'gemini' and self.gemini_client:
+                    response = self.gemini_client.generate_content(prompt)
+                else:
+                    raise ValueError("No LLM provider available")
+
                 if hasattr(response, 'text') and response.text:
-                    logger.info(f"✅ Gemini response received ({len(response.text)} characters)")
+                    logger.info(f"✅ {provider_name} response received ({len(response.text)} characters)")
                     return response.text
                 else:
-                    raise ValueError("Empty response from Gemini")
-                
+                    raise ValueError(f"Empty response from {provider_name}")
+
             except Exception as e:
-                logger.warning(f"Gemini API error (attempt {attempt + 1}/{max_retries}): {e}")
+                provider_name = self.provider.upper() if self.provider else "LLM"
+                logger.warning(f"{provider_name} API error (attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt == max_retries - 1:
-                    logger.error("❌ All Gemini retry attempts failed - using fallback sections")
+                    logger.error(f"❌ All {provider_name} retry attempts failed - using fallback sections")
                     raise
-                
+
                 # Exponential backoff with maximum wait time
                 import time
                 wait_time = min(2 ** attempt, 30)  # Max 30 seconds
