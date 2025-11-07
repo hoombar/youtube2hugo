@@ -852,44 +852,50 @@ MANDATORY BOUNDARY PRESERVATION:
 3. Keep the markers scattered throughout the text to mark timing boundaries
 4. If ANY markers are missing, the entire system fails
 
-BALANCED CONTENT TRANSFORMATION (while keeping all markers):
-1. **PRESERVE TECHNICAL INFORMATION**: Keep all technical details, explanations, and specific information intact
-2. **IMPROVE READABILITY**: Transform conversational speech into clear, structured prose
-3. **STRUCTURED SECTIONS**: Use ## markdown headers for clear topic organization  
-4. **CLEAN SPEECH PATTERNS**: Remove filler words, fix grammar, and improve sentence flow
-5. **MAINTAIN INSTRUCTIONAL VALUE**: Preserve references to demonstrations and visual examples
+PRESERVE THE SPEAKER'S AUTHENTIC VOICE (while keeping all markers):
+1. **KEEP THE SPEAKER'S PERSONALITY**: Maintain their natural way of explaining things, their humor, enthusiasm, and speaking style
+2. **PRESERVE THEIR PHRASING**: Keep casual expressions, idioms, and how THEY naturally explain concepts ("so basically", "the thing is", "here's what I found")
+3. **STRUCTURED SECTIONS**: Use ## markdown headers for clear topic organization
+4. **CLEAN ONLY SPEECH ARTIFACTS**: Remove ONLY filler words (um, uh, you know), false starts, and awkward repetitions
+5. **MAINTAIN THEIR VOICE**: Keep contractions, casual tone, personal anecdotes, and their specific way of teaching
 
-TRANSFORMATION EXAMPLES:
-❌ "Right, so, um, you want to know how to build a proper ZigBee network"
-✅ "Want to build a solid ZigBee network? I'll walk you through the key components you need to understand"
+WHAT TO PRESERVE:
+- The speaker's personality and humor
+- Their specific phrases and way of explaining ("so", "basically", "the thing is")
+- Their enthusiasm and energy level
+- Personal stories and examples
+- How THEY naturally structure their thoughts
+- Their casual, conversational phrasing
 
-❌ "Now let's talk about channel selection this is really important stuff"
-✅ "Channel selection is really important - it can make or break your network performance, so you'll want to get this right"
+WHAT TO REMOVE (ONLY):
+- Speech artifacts: "um", "uh", "you know", "like" (when used as filler)
+- False starts: "I was going to... actually, let me..."
+- Awkward repetitions: "and then, and then, and then"
+- Grammatical errors from speaking quickly
 
-❌ "You can see here in the interface that the coordinator is basically the brain"
-✅ "You can see in the interface that the coordinator is basically the brain of your whole network"
+CLEANUP EXAMPLES (preserve personality, remove only artifacts):
+❌ TRANSCRIPT: "Right, so, um, you want to know how to, uh, build a proper ZigBee network, um, yeah"
+✅ BLOG: "Right, so you want to know how to build a proper ZigBee network"
 
-CONVERSATIONAL WRITING STYLE:
-- Use "I" and "you" throughout the content
-- Write like you're giving friendly advice to a friend
-- Use contractions naturally ("you'll", "I'll", "don't", "won't")
-- Keep technical accuracy but make it approachable
-- Add encouraging phrases like "you've got this" or "it's easier than you think"
+❌ TRANSCRIPT: "Now let's talk about, uh, channel selection, you know, this is, like, really important stuff"
+✅ BLOG: "Now let's talk about channel selection - this is really important stuff"
 
-CONTENT TRANSFORMATION REQUIREMENTS:
-- Transform conversational speech into clear, instructional prose
-- Keep ALL technical details, settings, values, and specific information
-- Preserve the logical flow and sequence of instructions
-- Convert "you can see" references into clear descriptive language
-- Maintain all practical examples and demonstrations mentioned
-- Remove speech filler but preserve substantive conversational context
+❌ TRANSCRIPT: "You can see here in the, um, interface that the coordinator is, you know, basically the brain"
+✅ BLOG: "You can see here in the interface that the coordinator is basically the brain"
+
+CRITICAL VOICE PRESERVATION:
+- DO NOT make it more formal or polished
+- DO NOT change their way of explaining into generic advice
+- DO NOT remove their personality quirks or casual phrasing
+- DO NOT impose a "professional" or "expert" tone
+- Make it read like the speaker sat down and wrote this themselves
 
 Title: {title}
 
 Content with timestamp markers:
 {content}
 
-Transform this into a professional, well-structured blog post that reads like expert technical documentation, not a transcript. PRESERVE EVERY TIMESTAMP MARKER while completely rewriting the conversational language.
+Clean up this transcript into a readable blog post while preserving the speaker's authentic voice and personality. PRESERVE EVERY TIMESTAMP MARKER. Remove only speech artifacts (um, uh, repetitions), but keep the speaker's natural way of explaining and their conversational style. Make it read like they wrote this themselves, not like someone else is explaining their content.
 """
         
         try:
@@ -938,31 +944,37 @@ Output: Professional blog post with ALL timestamp markers preserved and transcri
             raise
     
     def _format_as_blog_post_educational(self, content: str, title: str) -> str:
-        """Educational prompting strategy to avoid safety filters."""
-        
+        """Educational prompting strategy with speaker's voice preserved."""
+
         prompt = f"""
-Transform this educational technology tutorial transcript into a well-structured instructional article about "{title}".
+Clean up this educational technology tutorial transcript about "{title}" while preserving the speaker's authentic teaching style.
 
 EDUCATIONAL CONTEXT: This content is from a technical tutorial video about home automation setup and configuration. The content teaches legitimate technology skills for educational purposes.
 
-CONTENT TRANSFORMATION REQUIREMENTS:
+VOICE PRESERVATION REQUIREMENTS:
 1. PRESERVE ALL __TIMESTAMP_X.X__ markers EXACTLY as they appear
 2. Structure content with clear ## markdown headers for different topics
-3. Transform spoken language into clear written instructions
-4. Keep all technical details and step-by-step guidance
-5. Organize information in a logical learning sequence
+3. Keep the speaker's natural teaching style and personality
+4. Remove ONLY speech artifacts (um, uh, repetitions), not their way of explaining
+5. Maintain their enthusiasm and how THEY explain concepts
 
-INSTRUCTIONAL FORMATTING:
-- Use descriptive section headers that explain what users will learn
-- Convert "let's do this" language into "to accomplish this task"
-- Transform "you can see" into "the interface displays" or "the system shows"
-- Keep all technical terms, settings, and specific values mentioned
-- Maintain the instructional flow and sequence
+PRESERVE THE SPEAKER'S TEACHING STYLE:
+- Keep their casual teaching phrases ("let's do this", "here's what you need", "so basically")
+- Keep active voice and personal pronouns ("you can see", "I'll show you", "let's look at")
+- DO NOT convert to passive voice ("the interface displays", "the system shows")
+- Keep their personality, humor, and specific way of teaching
+- Maintain their natural instructional flow
+
+CLEANUP ONLY:
+- Remove filler words: "um", "uh", "you know"
+- Fix grammatical errors from speaking
+- Remove awkward repetitions
+- DO NOT change their teaching style or personality
 
 Educational content:
 {content}
 
-Transform this into a clear, educational article that teaches these technology concepts effectively.
+Clean up this transcript while keeping the speaker's authentic voice. Make it read like they wrote this educational article themselves, preserving their natural teaching style and enthusiasm.
 """
         
         try:
@@ -973,31 +985,37 @@ Transform this into a clear, educational article that teaches these technology c
             raise
     
     def _format_as_blog_post_tutorial(self, content: str, title: str) -> str:
-        """Tutorial prompting strategy focused on how-to content."""
-        
+        """Tutorial prompting strategy with speaker's voice preserved."""
+
         prompt = f"""
-Convert this technology tutorial transcript into a comprehensive how-to guide about "{title}".
+Clean up this technology tutorial transcript about "{title}" while preserving the speaker's natural way of teaching.
 
-PURPOSE: Create an instructional guide that teaches users how to properly configure and use home automation technology.
+PURPOSE: Create a tutorial that teaches users how to properly configure home automation technology, written in the speaker's authentic voice.
 
-FORMATTING REQUIREMENTS:
+VOICE PRESERVATION REQUIREMENTS:
 1. PRESERVE ALL __TIMESTAMP_X.X__ markers exactly as written
 2. Create clear ## section headers for each major topic
-3. Focus on step-by-step instructions and best practices
-4. Explain the reasoning behind technical decisions
-5. Keep all specific technical details and configuration values
+3. Keep the speaker's casual, hands-on teaching approach
+4. Remove ONLY speech artifacts, not their personality
+5. Maintain how THEY explain concepts and guide users
 
-TUTORIAL STRUCTURE:
-- Transform conversational explanations into clear instructions
-- Change "we're going to" into "this guide will show you how to"
-- Convert "if you look at" into "examine the following"
-- Keep all technical specifications and recommended settings
-- Maintain the logical progression of setup steps
+PRESERVE THE SPEAKER'S TUTORIAL STYLE:
+- Keep their casual instruction phrases ("we're going to", "let's do this", "you'll want to")
+- Keep personal pronouns and active voice ("if you look at", "I'll show you")
+- DO NOT convert to formal language ("this guide will show you", "examine the following")
+- Keep their way of explaining reasoning and decisions
+- Maintain their natural, hands-on teaching progression
+
+CLEANUP ONLY:
+- Remove filler words: "um", "uh", "you know"
+- Fix grammatical errors from speaking
+- Remove awkward repetitions
+- DO NOT change their teaching approach or personality
 
 Tutorial content:
 {content}
 
-Create a comprehensive tutorial that guides users through these technical procedures.
+Clean up this tutorial transcript while keeping the speaker's authentic voice. Make it read like they wrote this how-to guide themselves, preserving their natural, hands-on teaching style.
 """
         
         try:
@@ -1008,31 +1026,37 @@ Create a comprehensive tutorial that guides users through these technical proced
             raise
     
     def _format_as_blog_post_guide(self, content: str, title: str) -> str:
-        """Guide prompting strategy with focus on reference material."""
-        
+        """Guide prompting strategy with speaker's voice preserved."""
+
         prompt = f"""
-Transform this technical reference transcript into a comprehensive guide about "{title}".
+Clean up this technical guide transcript about "{title}" while preserving the speaker's natural way of explaining concepts.
 
-REFERENCE GUIDE CONTEXT: This material provides technical information about home automation systems, network configuration, and device setup procedures for legitimate educational and reference purposes.
+GUIDE CONTEXT: This material provides technical information about home automation systems, written in the speaker's authentic voice for educational and reference purposes.
 
-TRANSFORMATION GUIDELINES:
+VOICE PRESERVATION GUIDELINES:
 1. PRESERVE ALL __TIMESTAMP_X.X__ markers without modification
 2. Organize information with clear ## section headers
-3. Present information as reference material and best practices
-4. Focus on technical accuracy and completeness
-5. Structure content for easy lookup and reference
+3. Keep the speaker's way of sharing knowledge and best practices
+4. Remove ONLY speech artifacts, not their personality
+5. Maintain their natural way of explaining technical concepts
 
-REFERENCE FORMATTING:
-- Convert spoken explanations into concise reference information
-- Transform "what you need to know" into "key concepts include"
-- Change "here's how to" into "the procedure involves"
-- Preserve all technical specifications and configuration details
-- Organize related concepts together logically
+PRESERVE THE SPEAKER'S GUIDE STYLE:
+- Keep their casual explanation phrases ("what you need to know", "here's how to", "here's the thing")
+- Keep personal pronouns and direct language ("you'll want to", "I found that", "this is important")
+- DO NOT convert to formal language ("key concepts include", "the procedure involves")
+- Keep their way of organizing and presenting information
+- Maintain their natural flow and emphasis
+
+CLEANUP ONLY:
+- Remove filler words: "um", "uh", "you know"
+- Fix grammatical errors from speaking
+- Remove awkward repetitions
+- DO NOT change their explanation style or personality
 
 Reference material:
 {content}
 
-Create a comprehensive reference guide that presents this technical information clearly and accurately.
+Clean up this guide transcript while keeping the speaker's authentic voice. Make it read like they wrote this reference guide themselves, preserving their natural way of explaining and organizing technical information.
 """
         
         try:

@@ -27,7 +27,7 @@ class Config:
 
     # LLM Provider settings
     LLM_PROVIDER = "groq"  # Default provider: "groq" or "gemini"
-    GROQ_MODEL = "llama-3.1-70b-versatile"  # Default Groq model
+    GROQ_MODEL = "llama-3.3-70b-versatile"  # Default Groq model
     GEMINI_MODEL = "gemini-2.5-flash"  # Default Gemini model
     
     # Output settings

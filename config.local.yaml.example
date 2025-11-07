@@ -13,7 +13,7 @@ llm:
   # Groq Configuration (Recommended - Better for technical content)
   groq:
     api_key: "gsk_your_groq_api_key_here"  # Get free key at https://console.groq.com
-    model: "llama-3.1-70b-versatile"  # Options: llama-3.1-70b-versatile, llama-3.1-8b-instant, mixtral-8x7b-32768
+    model: "llama-3.3-70b-versatile"  # Options: llama-3.3-70b-versatile, llama-3.1-8b-instant
 
   # Gemini Configuration (Alternative - Google's AI)
   gemini:
@@ -24,7 +24,7 @@ llm:
 
 # NOTE: You can also use environment variables:
 #   export GROQ_API_KEY="gsk_your_key_here"
-#   export GROQ_MODEL="llama-3.1-70b-versatile"
+#   export GROQ_MODEL="llama-3.3-70b-versatile"
 #   export GEMINI_API_KEY="your_key_here"
 #   export LLM_PROVIDER="groq"
 
@@ -35,7 +35,7 @@ llm:
 # If you prefer the old format, this still works:
 # groq:
 #   api_key: "gsk_your_key_here"
-#   model: "llama-3.1-70b-versatile"
+#   model: "llama-3.3-70b-versatile"
 #
 # gemini:
 #   api_key: "your_gemini_api_key_here"

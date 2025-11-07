@@ -51,7 +51,7 @@ class GroqFormatter:
             config.get('groq', {}).get('model') or
             config.get('llm', {}).get('groq', {}).get('model') or
             os.getenv('GROQ_MODEL') or
-            'llama-3.1-70b-versatile'  # Default model
+            'llama-3.3-70b-versatile'  # Default model
         )
 
         logger.info(f"Groq API client initialized with model: {self.model}")
