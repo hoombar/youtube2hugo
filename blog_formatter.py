@@ -227,7 +227,26 @@ class BlogFormatter:
         
         # Convert transcript segments to text with timestamp markers
         raw_content_with_markers = self._transcript_segments_to_text_with_markers(transcript_segments)
-        
+
+        # Validate transcript length - warn if it's very large
+        transcript_word_count = len(raw_content_with_markers.split())
+        transcript_tokens_estimate = int(transcript_word_count * 1.3)  # Rough estimate: 1.3 tokens per word
+        prompt_tokens_estimate = 2000  # Estimated prompt size
+        total_tokens_estimate = transcript_tokens_estimate + prompt_tokens_estimate
+
+        logger.info(f"📊 Transcript analysis:")
+        logger.info(f"   Words: {transcript_word_count:,}")
+        logger.info(f"   Estimated tokens: ~{transcript_tokens_estimate:,}")
+        logger.info(f"   Total with prompt: ~{total_tokens_estimate:,} tokens")
+
+        if total_tokens_estimate > 20000:
+            logger.warning(f"⚠️  Large transcript detected: ~{total_tokens_estimate:,} tokens")
+            logger.warning(f"   Current max_tokens=32000 should be sufficient, but generation may take longer")
+        elif total_tokens_estimate > 30000:
+            logger.error(f"🚨 Very large transcript: ~{total_tokens_estimate:,} tokens")
+            logger.error(f"   This may exceed max_tokens=32000 limit!")
+            logger.error(f"   Consider increasing max_tokens or implementing chunking strategy")
+
         # Apply technical terms corrections
         corrected_content = self._apply_technical_corrections(raw_content_with_markers)
         
@@ -303,7 +322,7 @@ class BlogFormatter:
         try:
             full_prompt = f"{prompt}\n\nContent to format:\n{content}"
 
-            response = self._generate_content(full_prompt, max_tokens=8000, temperature=0.2)
+            response = self._generate_content(full_prompt, max_tokens=32000, temperature=0.2)
 
             formatted_content = self._safe_extract_response_text(response)
             
@@ -336,26 +355,27 @@ CRITICAL PRESERVATION REQUIREMENTS:
 
 MANDATORY BLOG STRUCTURE REQUIREMENTS:
 - **MUST start with a compelling introduction** using "## Introduction" header (NOT the title)
-- **MUST create AT LEAST 5-7 clear section headers** using ## format for main topics
-- **MUST break up ALL long paragraphs** - maximum 3-4 sentences per paragraph
-- **MUST eliminate ALL transcript language** (remove "Right", "So", "Now", "Let's", "Okay")
+- **Create semantic section headers** using ## format for MAJOR topics only
+- **Each ## section MUST contain at least 3 paragraphs** - don't create sections for every minor concept
+- **MUST break up long paragraphs** - aim for 3-4 sentences per paragraph
+- **MUST eliminate transcript language** (remove "Right", "So", "Now", "Let's", "Okay" at start of sentences)
 - **MUST add a "## Conclusion" section** that summarizes key takeaways
 
 CRITICAL SECTION CREATION RULES:
-- EVERY major topic change MUST have a ## header
-- Look for topic transitions like equipment discussion → placement → channel selection → troubleshooting
-- Convert ANY mention of "let's talk about X" into "## X"
-- Convert ANY mention of "now we're going to cover Y" into "## Y" 
-- Add ## headers before discussing ANY new concept or tool
+- Create sections for SIGNIFICANT topic changes only, not every concept
+- Group related subtopics together under broader section headers
+- Each section should have substantial content (at least 3 paragraphs)
+- Don't fragment content into many small sections
+- Look for major topic transitions, not minor concept changes
+- Convert "let's talk about X" into content under appropriate section, not necessarily a new header
 
-REQUIRED SECTION STRUCTURE (YOU MUST USE THESE):
-## Introduction
-## [Topic 1 - extract from content]
-## [Topic 2 - extract from content] 
-## [Topic 3 - extract from content]
-## [Topic 4 - extract from content]
-## [Topic 5 - extract from content]
-## Conclusion
+SECTION STRUCTURE GUIDANCE:
+## Introduction (1-2 paragraphs overview)
+## [Major Topic 1] (at least 3 paragraphs)
+## [Major Topic 2] (at least 3 paragraphs)
+## [Major Topic 3] (at least 3 paragraphs)
+... (as many major topics as needed)
+## Conclusion (1-2 paragraphs summary)
 
 AGGRESSIVE TRANSFORMATION EXAMPLES:
 - "Right, so you want to know how to build..." → "## Introduction\n\nWant to build a reliable ZigBee network? I'll walk you through everything you need to know..."
@@ -410,11 +430,13 @@ WHAT NOT TO DO:
 Your goal is to transform transcript-style content into engaging blog format while preserving every detail and image.
 
 CRITICAL VERIFICATION CHECKLIST - OUTPUT WILL BE REJECTED IF ANY ITEM IS MISSING:
-✓ Output contains AT LEAST 5 section headers starting with "##"
+✓ Each ## section contains at least 3 paragraphs (except Introduction/Conclusion which can be shorter)
 ✓ First section is "## Introduction"
-✓ Last section is "## Conclusion" 
-✓ NO paragraphs longer than 4 sentences
-✓ NO transcript language ("Right", "So", "Now", "Let's", "Okay")
+✓ Last section is "## Conclusion"
+✓ Paragraphs are focused - aim for 3-4 sentences per paragraph
+✓ ALL filler words removed ("kind of", "like", "you know", "um", "uh", "basically", "essentially")
+✓ NO transcript language at start of sentences ("Right", "So", "Now", "Let's", "Okay")
+✓ Run-on sentences are broken into clear, focused sentences
 ✓ All ![...](filename.jpg) references are present and unchanged
 ✓ Images remain in their original positions relative to text
 ✓ All technical content and examples are preserved
@@ -705,11 +727,13 @@ THIS IS YOUR SECOND ATTEMPT. THE FIRST ATTEMPT FAILED VALIDATION.
 
 MANDATORY REQUIREMENTS (YOUR OUTPUT WILL BE REJECTED IF MISSING):
 1. Must start with exactly "## Introduction" (NOT the title)
-2. Must have AT LEAST 5 total sections with ## headers
-3. Must end with exactly "## Conclusion"  
-4. NO transcript words: "Right", "So", "Let's", "Now", "Okay" anywhere
-5. Maximum 3 sentences per paragraph
-6. All images ![...](file.jpg) must be preserved exactly
+2. Each ## section must have at least 3 paragraphs (except Introduction/Conclusion)
+3. Must end with exactly "## Conclusion"
+4. ALL filler words removed: "kind of", "like", "you know", "um", "uh", "basically", "essentially"
+5. NO transcript words at start of sentences: "Right", "So", "Let's", "Now", "Okay"
+6. Run-on sentences split into clear, focused sentences
+7. Paragraphs focused - aim for 3-4 sentences per paragraph
+8. All images ![...](file.jpg) must be preserved exactly
 
 EXAMPLE STRUCTURE YOU MUST FOLLOW:
 ## Introduction
@@ -734,7 +758,7 @@ Content to transform:
 CRITICAL: Your output MUST start with "## Introduction" and end with "## Conclusion"."""
         
         try:
-            response = self._generate_content(prompt, max_tokens=8000, temperature=0.1)
+            response = self._generate_content(prompt, max_tokens=32000, temperature=0.1)
             return self._safe_extract_response_text(response)
         except Exception as e:
             logger.error(f"Error in strict blog formatting: {e}")
@@ -858,54 +882,59 @@ CRITICAL CHRONOLOGICAL ORDER REQUIREMENT:
 - Sections MUST follow the video timeline - timestamps should increase sequentially
 - This ensures selectable video frames match the section content being discussed
 
-PRESERVE THE SPEAKER'S AUTHENTIC VOICE (while keeping all markers):
-1. **KEEP THE SPEAKER'S PERSONALITY**: Maintain their natural way of explaining things, their humor, enthusiasm, and speaking style
-2. **PRESERVE THEIR PHRASING**: Keep casual expressions, idioms, and how THEY naturally explain concepts ("so basically", "the thing is", "here's what I found")
+TRANSFORM SPOKEN CONTENT INTO WRITTEN BLOG PROSE (while keeping all markers):
+1. **KEEP THE SPEAKER'S PERSONALITY**: Maintain their natural way of explaining, humor, enthusiasm, and teaching style
+2. **USE CONVERSATIONAL BLOG TONE**: Keep personal pronouns (I, you), contractions, and direct address
 3. **STRUCTURED SECTIONS**: Use ## markdown headers for clear topic organization
-4. **CLEAN ONLY SPEECH ARTIFACTS**: Remove ONLY filler words (um, uh, you know), false starts, and awkward repetitions
-5. **MAINTAIN THEIR VOICE**: Keep contractions, casual tone, personal anecdotes, and their specific way of teaching
+4. **CLEAN UP FILLER WORDS AND RUN-ONS**: Transform spoken patterns into polished written prose
+5. **MAINTAIN AUTHENTICITY**: Keep personal anecdotes, specific examples, and the speaker's unique perspective
 
-WHAT TO PRESERVE:
-- The speaker's personality and humor
-- Their specific phrases and way of explaining ("so", "basically", "the thing is")
-- Their enthusiasm and energy level
-- Personal stories and examples
-- How THEY naturally structure their thoughts
-- Their casual, conversational phrasing
+MANDATORY FILLER WORD REMOVAL - Remove ALL instances of:
+- "kind of" / "sort of" → remove or use precise language
+- "like" (when used as filler) → remove
+- "you know" → remove
+- "I mean" → remove
+- "um", "uh" → remove
+- "basically", "essentially" → remove or use sparingly (max once per section if truly needed)
+- "actually", "really", "just" (when used as filler) → remove unless adding meaning
+- "Right,", "So,", "Now,", "Okay," at start of sentences → remove
 
-WHAT TO REMOVE (ONLY):
-- Speech artifacts: "um", "uh", "you know", "like" (when used as filler)
-- False starts: "I was going to... actually, let me..."
-- Awkward repetitions: "and then, and then, and then"
-- Grammatical errors from speaking quickly
+SENTENCE STRUCTURE TRANSFORMATION:
+- Break run-on sentences into clear, focused sentences
+- Each sentence should express ONE complete thought
+- Use proper punctuation to separate ideas
+- Transform comma splices into separate sentences or proper conjunctions
 
-CLEANUP EXAMPLES (preserve personality, remove only artifacts):
+TRANSFORMATION EXAMPLES (clean up while keeping personality):
+❌ TRANSCRIPT: "You can kind of buy them off Amazon, you plug a hose in, and it has a motion sensor built into it and when it detects motion, it sets off a little spray of water and it turns on for like a few seconds."
+✅ BLOG: "You can buy them off Amazon. You plug a hose in, and it has a motion sensor built into it. When it detects motion, it sets off a spray of water for a few seconds."
+
+❌ TRANSCRIPT: "So basically what I did was, um, I took this ZigBee coordinator and, you know, it's basically the brain of the network"
+✅ BLOG: "I took this ZigBee coordinator - it's the brain of the network."
+
 ❌ TRANSCRIPT: "Right, so, um, you want to know how to, uh, build a proper ZigBee network, um, yeah"
-✅ BLOG: "Right, so you want to know how to build a proper ZigBee network"
+✅ BLOG: "You want to know how to build a proper ZigBee network."
 
 ❌ TRANSCRIPT: "Now let's talk about, uh, channel selection, you know, this is, like, really important stuff"
-✅ BLOG: "Now let's talk about channel selection - this is really important stuff"
+✅ BLOG: "Let's talk about channel selection - this is important stuff."
 
-❌ TRANSCRIPT: "You can see here in the, um, interface that the coordinator is, you know, basically the brain"
-✅ BLOG: "You can see here in the interface that the coordinator is basically the brain"
-
-CRITICAL VOICE PRESERVATION:
-- DO NOT make it more formal or polished
-- DO NOT change their way of explaining into generic advice
-- DO NOT remove their personality quirks or casual phrasing
-- DO NOT impose a "professional" or "expert" tone
-- Make it read like the speaker sat down and wrote this themselves
+BALANCE: Clean and Written, but Still Personal
+- Write like a blog post, not a transcribed speech
+- Keep the speaker's unique perspective and examples
+- Remove verbal tics while maintaining conversational warmth
+- Use complete, well-structured sentences
+- Preserve enthusiasm and teaching style
 
 Title: {title}
 
 Content with timestamp markers:
 {content}
 
-Clean up this transcript into a readable blog post while preserving the speaker's authentic voice and personality. PRESERVE EVERY TIMESTAMP MARKER. Remove only speech artifacts (um, uh, repetitions), but keep the speaker's natural way of explaining and their conversational style. Make it read like they wrote this themselves, not like someone else is explaining their content.
+Transform this transcript into polished blog prose while keeping the speaker's personality and perspective. PRESERVE EVERY TIMESTAMP MARKER. Remove ALL filler words (kind of, like, you know, um, uh, basically, etc.) and break up run-on sentences. Create substantial sections with at least 3 paragraphs each. The result should read like well-written blog content - conversational and personal, but not transcribed speech.
 """
         
         try:
-            response = self._generate_content(prompt, max_tokens=8000, temperature=0.1)
+            response = self._generate_content(prompt, max_tokens=32000, temperature=0.1)
             return self._safe_extract_response_text(response)
         except Exception as e:
             logger.error(f"Error in boundary-preserving blog formatting: {e}")
@@ -929,23 +958,30 @@ ABSOLUTE REQUIREMENTS - NO EXCEPTIONS:
 - MAINTAIN STRICT CHRONOLOGICAL ORDER - do not reorder content from the original transcript sequence
 - Timestamps MUST increase sequentially through the blog post to match video timeline
 
-CONTENT QUALITY REQUIREMENTS:
-- Transform transcript language into professional blog writing
-- Remove conversational words: "Right", "So", "Now", "Let's", "Okay"
-- Use authoritative tone and definitive statements
-- Break content into focused paragraphs
-- Maintain technical accuracy
+SECTION REQUIREMENTS:
+- Create substantial sections - each ## section MUST contain at least 3 paragraphs
+- Group related content together, don't fragment into many small sections
+- Focus on MAJOR topic changes, not every minor concept
+
+CONTENT CLEANUP REQUIREMENTS:
+- Transform transcript language into polished blog writing
+- Remove ALL filler words: "kind of", "sort of", "like", "you know", "um", "uh", "I mean", "basically", "essentially"
+- Remove "Right,", "So,", "Now,", "Let's,", "Okay," at start of sentences
+- Break run-on sentences into clear, focused sentences
+- Each sentence should express ONE complete thought
+- Use conversational but polished blog tone
+- Maintain technical accuracy and speaker's personality
 
 Title: {title}
 
 Content with ESSENTIAL timestamp markers:
 {content}
 
-Output: Professional blog post with ALL timestamp markers preserved and transcript language transformed into polished writing.
+Output: Polished blog post with ALL timestamp markers preserved, ALL filler words removed, run-on sentences split, and substantial sections (3+ paragraphs each). Conversational but written, not transcribed speech.
 """
         
         try:
-            response = self._generate_content(prompt, max_tokens=8000, temperature=0.0)
+            response = self._generate_content(prompt, max_tokens=32000, temperature=0.0)
             return self._safe_extract_response_text(response)
         except Exception as e:
             logger.error(f"Error in strict boundary-preserving blog formatting: {e}")
@@ -986,7 +1022,7 @@ Clean up this transcript while keeping the speaker's authentic voice. Make it re
 """
         
         try:
-            response = self._generate_content(prompt, max_tokens=8000, temperature=0.2)
+            response = self._generate_content(prompt, max_tokens=32000, temperature=0.2)
             return self._safe_extract_response_text(response)
         except Exception as e:
             logger.error(f"Error in educational blog formatting: {e}")
@@ -1027,7 +1063,7 @@ Clean up this tutorial transcript while keeping the speaker's authentic voice. M
 """
         
         try:
-            response = self._generate_content(prompt, max_tokens=8000, temperature=0.1)
+            response = self._generate_content(prompt, max_tokens=32000, temperature=0.1)
             return self._safe_extract_response_text(response)
         except Exception as e:
             logger.error(f"Error in tutorial blog formatting: {e}")
@@ -1068,7 +1104,7 @@ Clean up this guide transcript while keeping the speaker's authentic voice. Make
 """
         
         try:
-            response = self._generate_content(prompt, max_tokens=8000, temperature=0.3)
+            response = self._generate_content(prompt, max_tokens=32000, temperature=0.3)
             return self._safe_extract_response_text(response)
         except Exception as e:
             logger.error(f"Error in guide blog formatting: {e}")

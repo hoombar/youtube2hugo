@@ -97,6 +97,17 @@ class GroqFormatter:
             # Get finish reason
             finish_reason = completion.choices[0].finish_reason
 
+            # CHECK FOR TRUNCATION - raise error if token limit was hit
+            if finish_reason == "length":
+                logger.error("🚨 GROQ TOKEN LIMIT REACHED - Content was truncated!")
+                logger.error(f"   Generated {len(response_text)} chars before hitting limit")
+                logger.error(f"   Current max_tokens: {max_tokens}")
+                logger.error("💡 Solution: Increase max_tokens in the calling function")
+                raise ValueError(
+                    f"Groq hit token limit at {max_tokens} tokens. "
+                    f"Content was truncated. Increase max_tokens to handle longer content."
+                )
+
             # Create response object
             return GroqResponse(
                 text=response_text,
