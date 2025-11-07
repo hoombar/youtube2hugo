@@ -852,6 +852,12 @@ MANDATORY BOUNDARY PRESERVATION:
 3. Keep the markers scattered throughout the text to mark timing boundaries
 4. If ANY markers are missing, the entire system fails
 
+CRITICAL CHRONOLOGICAL ORDER REQUIREMENT:
+- DO NOT REORDER CONTENT - maintain strict chronological sequence as it appears in the transcript
+- Create section headers (##) for topic organization, but keep all content in original time order
+- Sections MUST follow the video timeline - timestamps should increase sequentially
+- This ensures selectable video frames match the section content being discussed
+
 PRESERVE THE SPEAKER'S AUTHENTIC VOICE (while keeping all markers):
 1. **KEEP THE SPEAKER'S PERSONALITY**: Maintain their natural way of explaining things, their humor, enthusiasm, and speaking style
 2. **PRESERVE THEIR PHRASING**: Keep casual expressions, idioms, and how THEY naturally explain concepts ("so basically", "the thing is", "here's what I found")
@@ -915,11 +921,13 @@ URGENT: You FAILED to preserve timestamp markers in the previous attempt. This i
 
 ABSOLUTE REQUIREMENTS - NO EXCEPTIONS:
 - PRESERVE EVERY SINGLE __TIMESTAMP_X.X__ marker EXACTLY as written
-- DO NOT DELETE, MODIFY, OR MOVE any timestamp markers  
+- DO NOT DELETE, MODIFY, OR MOVE any timestamp markers
 - Keep markers within the content flow, scattered throughout paragraphs
 - Use ## markdown headers for sections
 - Maintain full content - DO NOT SUMMARIZE
 - If ANY markers are missing, the entire system fails
+- MAINTAIN STRICT CHRONOLOGICAL ORDER - do not reorder content from the original transcript sequence
+- Timestamps MUST increase sequentially through the blog post to match video timeline
 
 CONTENT QUALITY REQUIREMENTS:
 - Transform transcript language into professional blog writing
@@ -1068,19 +1076,22 @@ Clean up this guide transcript while keeping the speaker's authentic voice. Make
     
     def _extract_and_clean_boundaries(self, content_with_markers: str) -> tuple[str, Dict]:
         """Extract boundary information and return clean content + boundary map."""
-        
+
         import re
-        
+
         # Find all timestamp markers
         marker_pattern = r'__TIMESTAMP_(\d+\.\d+)__'
         markers = re.findall(marker_pattern, content_with_markers)
         logger.info(f"🕒 Found {len(markers)} timestamp markers in content")
-        
+
         # Create boundary map by analyzing content structure
+        # First pass: identify all sections and collect their markers
         boundary_map = {}
+        section_markers = {}  # Maps section title to list of all markers in that section
         lines = content_with_markers.split('\n')
         current_section = None
-        
+        section_order = []  # Track order of sections
+
         for line_index, line in enumerate(lines):
             # Check if line contains a header
             header_match = re.match(r'^(#{1,3})\s+(.+)$', line)
@@ -1089,41 +1100,73 @@ Clean up this guide transcript while keeping the speaker's authentic voice. Make
                 # Remove any markers from the title
                 clean_title = re.sub(marker_pattern, '', section_title).strip()
                 current_section = clean_title
-                
-                # Find the first timestamp marker after this header
-                timestamp_match = re.search(marker_pattern, line)
-                if timestamp_match:
-                    timestamp = float(timestamp_match.group(1))
-                    boundary_map[clean_title] = timestamp
-                    logger.debug(f"📍 Found boundary: '{clean_title}' -> {timestamp:.1f}s (in header)")
+                section_markers[clean_title] = []
+                section_order.append(clean_title)
+
+            # Collect all timestamp markers in the current section
+            if current_section:
+                timestamp_matches = re.finditer(marker_pattern, line)
+                for match in timestamp_matches:
+                    timestamp = float(match.group(1))
+                    section_markers[current_section].append(timestamp)
+
+        # Second pass: determine section boundaries from collected markers
+        for section_title in section_order:
+            markers_in_section = section_markers.get(section_title, [])
+
+            if markers_in_section:
+                # Use the MINIMUM timestamp in this section as the start
+                # This handles cases where markers appear out of order within a section
+                min_timestamp = min(markers_in_section)
+                boundary_map[section_title] = min_timestamp
+                logger.debug(f"📍 Section '{section_title}' -> {min_timestamp:.1f}s (from {len(markers_in_section)} markers, range: {min(markers_in_section):.1f}-{max(markers_in_section):.1f}s)")
+            else:
+                # No markers found - use fallback
+                logger.warning(f"⚠️  No timestamp markers found for section: '{section_title}'")
+
+                # Check if this looks like an introduction/title section
+                title_keywords = ['introduction', 'elevate', 'getting started', 'overview', 'intro', 'debug', 'test', 'video', 'smart doorbell']
+                is_intro_section = any(keyword in section_title.lower() for keyword in title_keywords)
+
+                if len(boundary_map) == 0 or is_intro_section:
+                    # First section or intro: start at 0
+                    default_timestamp = 0.0
+                    logger.warning(f"   Detected intro/first section, using timestamp: 0.0s")
                 else:
-                    # Look in subsequent lines for the first timestamp
-                    found_timestamp = None
-                    for next_line in lines[line_index + 1:line_index + 10]:  # Check next 10 lines
-                        timestamp_match = re.search(marker_pattern, next_line)
-                        if timestamp_match:
-                            timestamp = float(timestamp_match.group(1))
-                            boundary_map[clean_title] = timestamp
-                            found_timestamp = timestamp
-                            logger.debug(f"📍 Found boundary: '{clean_title}' -> {timestamp:.1f}s (in content)")
-                            break
-                    
-                    if not found_timestamp:
-                        logger.warning(f"⚠️  No timestamp found for section: '{clean_title}'")
-                        # Use a default timestamp based on position
-                        # Check if this looks like an introduction/title section that should start at 0
-                        title_keywords = ['introduction', 'elevate', 'getting started', 'overview', 'intro', 'debug', 'test', 'video', 'smart doorbell']
-                        is_intro_section = any(keyword in clean_title.lower() for keyword in title_keywords)
-                        
-                        if len(boundary_map) == 0 or is_intro_section:
-                            # This is the first section OR an intro section, it should start at 0
-                            default_timestamp = 0.0
-                            logger.warning(f"   Detected intro/first section, using timestamp: 0.0s")
-                        else:
-                            # Subsequent sections: 60 seconds apart from the start
-                            default_timestamp = len(boundary_map) * 60  # 60 seconds apart as default
-                            logger.warning(f"   Using default timestamp: {default_timestamp:.1f}s")
-                        boundary_map[clean_title] = default_timestamp
+                    # Interpolate between surrounding sections
+                    prev_timestamps = [v for k, v in boundary_map.items()]
+                    if prev_timestamps:
+                        default_timestamp = max(prev_timestamps) + 30.0  # 30 seconds after last known
+                    else:
+                        default_timestamp = 60.0
+                    logger.warning(f"   Using interpolated timestamp: {default_timestamp:.1f}s")
+                boundary_map[section_title] = default_timestamp
+
+        # Validate and enforce chronological order
+        timestamps = [boundary_map[section] for section in section_order if section in boundary_map]
+        if timestamps != sorted(timestamps):
+            logger.warning(f"⚠️  Section timestamps are NOT in chronological order!")
+            logger.warning(f"   Order: {[f'{section}: {boundary_map[section]:.1f}s' for section in section_order if section in boundary_map]}")
+            logger.warning(f"   Attempting to auto-correct by enforcing chronological order...")
+
+            # Auto-correct: ensure each section starts at or after the previous section
+            corrected_boundary_map = {}
+            last_timestamp = 0.0
+            for section in section_order:
+                if section in boundary_map:
+                    original_timestamp = boundary_map[section]
+                    if original_timestamp < last_timestamp:
+                        # Section is out of order - place it right after the previous one
+                        corrected_timestamp = last_timestamp + 1.0
+                        logger.warning(f"   Corrected '{section}': {original_timestamp:.1f}s → {corrected_timestamp:.1f}s")
+                        corrected_boundary_map[section] = corrected_timestamp
+                        last_timestamp = corrected_timestamp
+                    else:
+                        corrected_boundary_map[section] = original_timestamp
+                        last_timestamp = original_timestamp
+
+            boundary_map = corrected_boundary_map
+            logger.info(f"✅ Enforced chronological order in section boundaries")
         
         # Clean all markers from content
         clean_content = re.sub(marker_pattern, '', content_with_markers)
