@@ -40,3 +40,5 @@ content/posts/*/
 
 # Logs
 *.log
+# Exception: Keep blocked_words.log for analyzing Gemini safety filter triggers
+!blocked_words.log

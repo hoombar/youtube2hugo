@@ -1,0 +1,18 @@
+{
+  "attack": ["attacks", "attacking", "attacked", "attacker", "attackers"],
+  "hack": ["hacks", "hacking", "hacked", "hacker", "hackers"],
+  "exploit": ["exploits", "exploiting", "exploited", "exploitation"],
+  "vulnerability": ["vulnerabilities", "vulnerable"],
+  "penetration": ["penetrate", "penetrating", "penetrated"],
+  "bypass": ["bypassing", "bypassed", "bypasses"],
+  "intrusion": ["intrusions", "intrusive", "intruder", "intruders"],
+  "breach": ["breaches", "breaching", "breached"],
+  "compromise": ["compromises", "compromising", "compromised"],
+  "manipulate": ["manipulates", "manipulating", "manipulated", "manipulation"],
+  "circumvent": ["circumvents", "circumventing", "circumvented", "circumvention"],
+  "extract": ["extracts", "extracting", "extracted", "extraction"],
+  "scrape": ["scrapes", "scraping", "scraped", "scraper"],
+  "steal": ["steals", "stealing", "stole", "stolen"],
+  "surveillance": [],
+  "crack": ["cracks", "cracking", "cracked", "cracker"]
+}

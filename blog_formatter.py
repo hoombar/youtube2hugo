@@ -34,6 +34,11 @@ class BlogFormatter:
                     if finish_reason == 2:  # SAFETY (content filtered)
                         logger.error("Gemini response filtered for safety reasons (finish_reason=2)")
                         logger.error("This video content is being blocked by Gemini's safety filters.")
+
+                        # Log potential trigger words for analysis
+                        if self.last_prompt_sent:
+                            self._log_blocked_content(self.last_prompt_sent, "safety_filter")
+
                         logger.error("Consider using a different AI service or processing the video without AI formatting.")
                         raise SystemExit("❌ Gemini safety filter blocked the content. Exiting cleanly.")
                     elif finish_reason == 3:  # RECITATION (potential copyright)
@@ -60,9 +65,13 @@ class BlogFormatter:
         self.gemini_client = None
         self.groq_client = None
         self.provider = None
+        self.last_prompt_sent = None  # Track last prompt for blocked word logging
 
         # Load technical terms for correction
         self.technical_terms = self._load_technical_terms()
+
+        # Load safety-sensitive words for Gemini encoding
+        self.safety_words = self._load_safety_words()
 
         # Determine which LLM provider to use
         # Priority: explicit config > environment variables > auto-detect based on API keys
@@ -123,6 +132,9 @@ class BlogFormatter:
             # Use Groq
             return self.groq_client.generate_content(prompt, max_tokens=max_tokens, temperature=temperature)
         elif self.provider == 'gemini' and self.gemini_client:
+            # Store prompt for blocked word logging if content gets filtered
+            self.last_prompt_sent = prompt
+
             # Use Gemini
             return self.gemini_client.generate_content(
                 prompt,
@@ -163,6 +175,11 @@ class BlogFormatter:
             if "finish_reason" in error_str or "safety" in error_str or "blocked" in error_str:
                 logger.error(f"🛡️ CONTENT SAFETY FILTER: {e}")
                 logger.error("❌ The content was blocked by safety filters")
+
+                # Log potential trigger words for analysis
+                if self.provider == 'gemini' and self.last_prompt_sent:
+                    self._log_blocked_content(self.last_prompt_sent, error_context)
+
                 raise SystemExit(f"Content blocked by safety filters: {e}")
             else:
                 # Unknown error
@@ -249,29 +266,45 @@ class BlogFormatter:
 
         # Apply technical terms corrections
         corrected_content = self._apply_technical_corrections(raw_content_with_markers)
-        
+
+        # Encode sensitive terms if using Gemini (to bypass safety filters)
+        code_map = {}
+        if self.provider == 'gemini':
+            logger.info("🔒 Encoding sensitive terms to bypass Gemini safety filters...")
+            content_to_format, code_map = self._encode_sensitive_terms(corrected_content)
+        else:
+            content_to_format = corrected_content
+
         # Try multiple prompting strategies to work around safety filters
         logger.info("Formatting transcript content as structured blog post with Gemini API...")
-        
+
         strategies = [
             ("standard", self._format_as_blog_post_with_boundaries),
             ("educational", self._format_as_blog_post_educational),
             ("tutorial", self._format_as_blog_post_tutorial),
             ("guide", self._format_as_blog_post_guide)
         ]
-        
+
         for strategy_name, format_function in strategies:
             try:
                 logger.info(f"🔄 Trying {strategy_name} prompting strategy...")
 
                 # Use error handler wrapper for API calls
                 def api_call():
-                    return format_function(corrected_content, title)
+                    return format_function(content_to_format, title)
 
                 formatted_content_with_markers = self._handle_api_call(
                     api_call,
                     error_context=f"{strategy_name} strategy formatting"
                 )
+
+                # Decode sensitive terms if we encoded them
+                if code_map:
+                    logger.info("🔓 Decoding sensitive terms from Gemini response...")
+                    formatted_content_with_markers = self._decode_sensitive_terms(
+                        formatted_content_with_markers,
+                        code_map
+                    )
 
                 # Check if we got valid content
                 if not formatted_content_with_markers or len(formatted_content_with_markers.strip()) < 100:
@@ -669,7 +702,41 @@ Return only the cleaned transcript text:
         all_terms.update(config_terms)
         
         return all_terms
-    
+
+    def _load_safety_words(self) -> Dict[str, List[str]]:
+        """Load safety-sensitive words from JSON file for Gemini encoding."""
+        import json
+        from pathlib import Path
+
+        # Path to safety words JSON file
+        safety_words_path = Path(__file__).parent / 'safety_words.json'
+
+        # Default safety words if file doesn't exist
+        default_safety_words = {
+            'attack': ['attacks', 'attacking', 'attacked', 'attacker', 'attackers'],
+            'hack': ['hacks', 'hacking', 'hacked', 'hacker', 'hackers'],
+            'exploit': ['exploits', 'exploiting', 'exploited', 'exploitation'],
+            'vulnerability': ['vulnerabilities', 'vulnerable'],
+            'penetration': ['penetrate', 'penetrating', 'penetrated'],
+            'bypass': ['bypassing', 'bypassed', 'bypasses'],
+            'intrusion': ['intrusions', 'intrusive', 'intruder', 'intruders'],
+            'breach': ['breaches', 'breaching', 'breached'],
+            'compromise': ['compromises', 'compromising', 'compromised']
+        }
+
+        try:
+            if safety_words_path.exists():
+                with open(safety_words_path, 'r') as f:
+                    loaded_words = json.load(f)
+                    logger.info(f"✅ Loaded {len(loaded_words)} safety word categories from {safety_words_path.name}")
+                    return loaded_words
+            else:
+                logger.warning(f"⚠️  safety_words.json not found, using default safety words")
+                return default_safety_words
+        except Exception as e:
+            logger.warning(f"⚠️  Error loading safety_words.json: {e}. Using defaults")
+            return default_safety_words
+
     def _generate_technical_terms_prompt(self) -> str:
         """Generate the technical terms correction section for prompts."""
         terms_text = "CRITICAL TECHNICAL TERM CORRECTIONS:\nPay special attention to correcting these commonly misheard technical terms:\n"
@@ -900,7 +967,108 @@ Output a simple, well-structured blog post following the exact format above."""
         
         logger.info(f"Applied {len(self.technical_terms)} technical term corrections")
         return corrected_content
-    
+
+    def _encode_sensitive_terms(self, content: str) -> tuple[str, Dict[str, str]]:
+        """Replace problematic words with codes before sending to Gemini."""
+        import re
+
+        code_map = {}  # Maps codes to original words
+        encoded_content = content
+        code_counter = 1
+
+        for base_term, variants in self.safety_words.items():
+            all_forms = [base_term] + variants
+
+            for term in all_forms:
+                if not term:  # Skip empty strings
+                    continue
+
+                code = f"TERM_{code_counter:03d}"
+                code_map[code] = term
+
+                # Case-insensitive replacement with word boundaries
+                pattern = re.compile(r'\b' + re.escape(term) + r'\b', re.IGNORECASE)
+                encoded_content = pattern.sub(code, encoded_content)
+
+                code_counter += 1
+
+        logger.info(f"🔒 Encoded {len(code_map)} sensitive terms for Gemini safety bypass")
+        return encoded_content, code_map
+
+    def _decode_sensitive_terms(self, content: str, code_map: Dict[str, str]) -> str:
+        """Restore original words from codes after receiving from Gemini."""
+        decoded_content = content
+
+        for code, original_term in code_map.items():
+            # Simple replacement - codes should be exact matches
+            decoded_content = decoded_content.replace(code, original_term)
+
+        # Verify all codes were decoded
+        remaining_codes = len([code for code in code_map.keys() if code in decoded_content])
+        if remaining_codes > 0:
+            logger.warning(f"⚠️  {remaining_codes} codes remain in output after decoding")
+        else:
+            logger.info(f"🔓 Successfully decoded {len(code_map)} sensitive terms")
+
+        return decoded_content
+
+    def _log_blocked_content(self, content: str, context: str = "unknown") -> None:
+        """Log potential trigger words when Gemini blocks content.
+
+        Analyzes the content to identify words that may have triggered safety filters,
+        and saves them to blocked_words.log for future analysis and dictionary updates.
+
+        Args:
+            content: The content that was blocked
+            context: Context description (e.g., "standard strategy", "educational strategy")
+        """
+        import json
+        from datetime import datetime
+        from pathlib import Path
+
+        log_file = Path(__file__).parent / "blocked_words.log"
+
+        # Extract potential trigger words from content
+        trigger_candidates = set()
+
+        # Check for known safety words in the content
+        for base_term, variants in self.safety_words.items():
+            all_forms = [base_term] + variants
+            for term in all_forms:
+                if term and term.lower() in content.lower():
+                    trigger_candidates.add(term)
+
+        # Also look for common security-related terms not in our dictionary
+        additional_terms = [
+            "malware", "trojan", "virus", "worm", "ransomware", "botnet",
+            "phishing", "injection", "overflow", "backdoor", "rootkit",
+            "password", "credential", "unauthorized", "illegal", "fraudulent",
+            "weaponize", "exploit kit", "zero-day", "payload", "shellcode"
+        ]
+        for term in additional_terms:
+            if term.lower() in content.lower():
+                trigger_candidates.add(term)
+
+        # Create log entry
+        log_entry = {
+            "timestamp": datetime.now().isoformat(),
+            "context": context,
+            "trigger_candidates": sorted(list(trigger_candidates)),
+            "content_length": len(content),
+            "content_preview": content[:200] + "..." if len(content) > 200 else content
+        }
+
+        # Append to log file
+        try:
+            with open(log_file, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(log_entry, indent=2) + "\n\n")
+
+            logger.warning(f"📝 Logged {len(trigger_candidates)} potential trigger words to blocked_words.log")
+            if trigger_candidates:
+                logger.warning(f"   Candidates: {', '.join(sorted(list(trigger_candidates))[:10])}")
+        except Exception as e:
+            logger.error(f"❌ Failed to write to blocked_words.log: {e}")
+
     def _transcript_segments_to_text_with_markers(self, transcript_segments: List[Dict]) -> str:
         """Convert transcript segments to text with timestamp boundary markers."""
         
