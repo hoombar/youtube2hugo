@@ -26,7 +26,7 @@ class Config:
     WHISPER_MODEL = "base"  # tiny, base, small, medium, large
 
     # LLM Provider settings
-    LLM_PROVIDER = "groq"  # Default provider: "groq" or "gemini"
+    LLM_PROVIDER = "gemini"  # Default provider: "groq" or "gemini"
     GROQ_MODEL = "llama-3.3-70b-versatile"  # Default Groq model
     GEMINI_MODEL = "gemini-2.5-flash"  # Default Gemini model
     

@@ -129,7 +129,7 @@ class HybridBlogCreator:
         
         # Step 2: AI-powered content processing
         logger.info("🤖 AI processing: cleaning transcript and creating sections...")
-        blog_formatter = BlogFormatter(self.config)
+        blog_formatter = BlogFormatter(self.flattened_config)
         
         try:
             # Generate structured blog content (this should be independent of frame processing mode!)
