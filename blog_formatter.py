@@ -79,7 +79,7 @@ class BlogFormatter:
             config.get('llm_provider') or
             config.get('llm', {}).get('provider') or
             os.getenv('LLM_PROVIDER') or
-            'groq'  # Default to Groq
+            'gemini'  # Default to Gemini
         ).lower()
 
         # Try to initialize the selected provider
