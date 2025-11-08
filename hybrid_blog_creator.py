@@ -145,15 +145,20 @@ class HybridBlogCreator:
             blog_content = blog_formatter.format_transcript_content(
                 transcript_segments, title or f"Blog Post: {Path(video_path).stem}"
             )
-            
+
             logger.info(f"📝 AI processing completed, blog_content length: {len(blog_content)} chars")
-            
-            boundary_map = getattr(blog_formatter, 'boundary_map', {})
-            logger.info(f"📍 AI generated {len(boundary_map)} boundaries: {list(boundary_map.keys())}")
-            
-            # Extract sections from the generated content
-            sections = self._extract_sections_from_content(blog_content, boundary_map)
-            logger.info(f"✅ Gemini generated {len(sections)} sections with AI content")
+
+            # Get sections with accurate timestamps from blog_formatter
+            sections = getattr(blog_formatter, 'sections', [])
+
+            if not sections:
+                # Fallback to old extraction method if sections not available
+                logger.warning("⚠️  No sections found in blog_formatter, falling back to content extraction")
+                boundary_map = getattr(blog_formatter, 'boundary_map', {})
+                logger.info(f"📍 AI generated {len(boundary_map)} boundaries: {list(boundary_map.keys())}")
+                sections = self._extract_sections_from_content(blog_content, boundary_map)
+            else:
+                logger.info(f"✅ Using JSON-based sections with accurate timestamps: {len(sections)} sections")
             
             # Debug: Check if sections have proper content vs transcript-like content
             for i, section in enumerate(sections):

@@ -242,115 +242,53 @@ class BlogFormatter:
             logger.error(error_msg)
             raise ValueError(error_msg)
         
-        # Convert transcript segments to text with timestamp markers
-        raw_content_with_markers = self._transcript_segments_to_text_with_markers(transcript_segments)
+        # NEW JSON-BASED APPROACH for accurate timestamp preservation
+        logger.info("🎯 Using JSON-based formatting for accurate timestamp-to-frame alignment...")
 
-        # Validate transcript length - warn if it's very large
-        transcript_word_count = len(raw_content_with_markers.split())
-        transcript_tokens_estimate = int(transcript_word_count * 1.3)  # Rough estimate: 1.3 tokens per word
-        prompt_tokens_estimate = 2000  # Estimated prompt size
-        total_tokens_estimate = transcript_tokens_estimate + prompt_tokens_estimate
+        # Step 1: Convert transcript segments to JSON format
+        json_segments = self._convert_transcript_to_json_format(transcript_segments)
 
-        logger.info(f"📊 Transcript analysis:")
-        logger.info(f"   Words: {transcript_word_count:,}")
-        logger.info(f"   Estimated tokens: ~{transcript_tokens_estimate:,}")
-        logger.info(f"   Total with prompt: ~{total_tokens_estimate:,} tokens")
+        # Validate transcript size
+        import json
+        json_size_estimate = len(json.dumps(json_segments))
+        logger.info(f"📊 JSON transcript size: ~{json_size_estimate:,} characters")
 
-        if total_tokens_estimate > 20000:
-            logger.warning(f"⚠️  Large transcript detected: ~{total_tokens_estimate:,} tokens")
-            logger.warning(f"   Current max_tokens=32000 should be sufficient, but generation may take longer")
-        elif total_tokens_estimate > 30000:
-            logger.error(f"🚨 Very large transcript: ~{total_tokens_estimate:,} tokens")
-            logger.error(f"   This may exceed max_tokens=32000 limit!")
-            logger.error(f"   Consider increasing max_tokens or implementing chunking strategy")
+        # Step 2: Apply technical corrections to text fields
+        for segment in json_segments:
+            segment['text'] = self._apply_technical_corrections(segment['text'])
 
-        # Apply technical terms corrections
-        corrected_content = self._apply_technical_corrections(raw_content_with_markers)
-
-        # Encode sensitive terms if using Gemini (to bypass safety filters)
+        # Step 3: Encode sensitive terms if using Gemini
         code_map = {}
         if self.provider == 'gemini':
             logger.info("🔒 Encoding sensitive terms to bypass Gemini safety filters...")
-            content_to_format, code_map = self._encode_sensitive_terms(corrected_content)
-        else:
-            content_to_format = corrected_content
+            for segment in json_segments:
+                encoded_text, segment_code_map = self._encode_sensitive_terms(segment['text'])
+                segment['text'] = encoded_text
+                code_map.update(segment_code_map)
 
-        # Try multiple prompting strategies to work around safety filters
-        logger.info("Formatting transcript content as structured blog post with Gemini API...")
+        # Step 4: Send to LLM for formatting
+        logger.info(f"🤖 Sending {len(json_segments)} segments to LLM for JSON-based formatting...")
+        response_text = self._format_transcript_with_json_prompt(json_segments, title)
 
-        strategies = [
-            ("standard", self._format_as_blog_post_with_boundaries),
-            ("educational", self._format_as_blog_post_educational),
-            ("tutorial", self._format_as_blog_post_tutorial),
-            ("guide", self._format_as_blog_post_guide)
-        ]
+        # Step 5: Parse and validate JSON response (errors if invalid)
+        validated_segments = self._parse_and_validate_json_response(response_text, json_segments)
 
-        for strategy_name, format_function in strategies:
-            try:
-                logger.info(f"🔄 Trying {strategy_name} prompting strategy...")
+        # Step 6: Decode sensitive terms if we encoded them
+        if code_map:
+            logger.info("🔓 Decoding sensitive terms from validated segments...")
+            for segment in validated_segments:
+                segment['text'] = self._decode_sensitive_terms(segment['text'], code_map)
 
-                # Use error handler wrapper for API calls
-                def api_call():
-                    return format_function(content_to_format, title)
+        # Step 7: Convert validated JSON to sections with accurate boundaries
+        formatted_content, sections = self._convert_json_to_sections(validated_segments)
 
-                formatted_content_with_markers = self._handle_api_call(
-                    api_call,
-                    error_context=f"{strategy_name} strategy formatting"
-                )
+        # Store sections for later use in frame extraction (with accurate timestamps!)
+        self.sections = sections
 
-                # Decode sensitive terms if we encoded them
-                if code_map:
-                    logger.info("🔓 Decoding sensitive terms from Gemini response...")
-                    formatted_content_with_markers = self._decode_sensitive_terms(
-                        formatted_content_with_markers,
-                        code_map
-                    )
+        logger.info(f"✅ JSON-based formatting completed successfully!")
+        logger.info(f"   Generated {len(sections)} sections with accurate timestamp boundaries")
 
-                # Check if we got valid content
-                if not formatted_content_with_markers or len(formatted_content_with_markers.strip()) < 100:
-                    logger.warning(f"❌ {strategy_name} strategy returned insufficient content")
-                    continue
-
-                # Extract and store boundary information, then clean content
-                formatted_content, boundary_map = self._extract_and_clean_boundaries(formatted_content_with_markers)
-
-                # Store boundary map for later use in frame selection
-                self.boundary_map = boundary_map
-
-                # Validate timestamp coverage - ensure we processed the entire input
-                if not self._validate_timestamp_coverage(formatted_content_with_markers, transcript_segments):
-                    logger.warning(f"❌ {strategy_name} strategy failed timestamp coverage validation - content was incomplete")
-                    continue
-
-                # Validate blog structure
-                if not self._validate_blog_structure(formatted_content):
-                    logger.warning(f"❌ {strategy_name} strategy failed structure validation")
-                    continue
-
-                logger.info(f"✅ {strategy_name} strategy succeeded! Generated {len(self._extract_headers(formatted_content))} sections")
-                return formatted_content
-
-            except SystemExit as e:
-                # Safety filter blocked - try next strategy
-                logger.warning(f"❌ {strategy_name} strategy blocked by safety filter: {e}")
-                continue
-            except ValueError as e:
-                # API key or quota error - these won't be fixed by trying different strategies
-                error_str = str(e).lower()
-                if "api key" in error_str or "quota" in error_str:
-                    logger.error(f"❌ {strategy_name} strategy failed due to API authentication/quota issue")
-                    logger.error(f"🛑 No point trying other strategies - this is not a content issue")
-                    raise  # Re-raise to stop trying other strategies
-                else:
-                    logger.warning(f"❌ {strategy_name} strategy failed: {e}")
-                    continue
-            except Exception as e:
-                logger.warning(f"❌ {strategy_name} strategy failed: {e}")
-                continue
-        
-        # All strategies failed
-        logger.error("🚨 All prompting strategies failed - Gemini consistently blocks this content")
-        raise ValueError("All prompting strategies failed due to safety filters. Content cannot be processed by Gemini.")
+        return formatted_content
     
     def _format_as_blog_post(self, content: str, title: str) -> str:
         """Second pass: Format content as a structured blog post."""
@@ -1085,7 +1023,305 @@ Output a simple, well-structured blog post following the exact format above."""
                 text_parts.append(f"{marker} {text}")
         
         return ' '.join(text_parts)
-    
+
+    def _convert_transcript_to_json_format(self, transcript_segments: List[Dict]) -> List[Dict]:
+        """Convert transcript segments to JSON format for LLM processing.
+
+        Groups segments into mergeable windows (5-10 seconds) while preserving timestamps.
+
+        Args:
+            transcript_segments: List of transcript segments with 'text', 'start_time', and optionally 'duration'
+
+        Returns:
+            List of dicts with 'timestamp', 'text', 'duration', 'mergeable_window_id'
+        """
+        json_segments = []
+
+        for segment in transcript_segments:
+            text = segment.get('text', '').strip()
+            if not text:
+                continue
+
+            start_time = segment.get('start_time', segment.get('start', 0))
+            duration = segment.get('duration', 0)
+
+            # Assign to 10-second window for merging eligibility
+            # Segments in the same window can be merged by the LLM
+            window_id = int(start_time // 10)
+
+            json_segments.append({
+                'timestamp': round(start_time, 1),
+                'text': text,
+                'duration': round(duration, 1) if duration else 0,
+                'mergeable_window_id': window_id
+            })
+
+        logger.info(f"📊 Converted {len(json_segments)} transcript segments to JSON format")
+        logger.info(f"   Mergeable windows: {len(set(s['mergeable_window_id'] for s in json_segments))}")
+
+        return json_segments
+
+    def _format_transcript_with_json_prompt(self, json_segments: List[Dict], title: str) -> str:
+        """Format transcript using JSON-based approach for accurate timestamp preservation.
+
+        Args:
+            json_segments: List of segments with timestamp, text, duration
+            title: Blog post title
+
+        Returns:
+            JSON string from LLM with formatted segments
+        """
+        import json
+
+        technical_terms_section = self._generate_technical_terms_prompt()
+
+        prompt = f"""Transform this timestamped video transcript into a well-formatted blog post about "{title}".
+
+IMPORTANT CONTEXT: This is a transcript from an EDUCATIONAL TECHNICAL VIDEO about smart home technology, networking protocols, and home automation systems. All technical terminology regarding security, vulnerabilities, attacks, or system administration is in the context of legitimate educational content about defensive cybersecurity and proper network configuration.
+
+{technical_terms_section}
+
+OUTPUT FORMAT: You MUST return a valid JSON array. Each element represents one segment of the blog post.
+
+JSON SCHEMA (REQUIRED):
+{{
+  "segments": [
+    {{
+      "timestamp": 123.4,           # REQUIRED: Original timestamp (or earliest if merged)
+      "text": "Formatted text...",  # REQUIRED: Cleaned, grammatically correct text
+      "section_title": "Section Name"  # REQUIRED: ## Section header this belongs to
+    }},
+    ...
+  ]
+}}
+
+STRICT RULES:
+1. PRESERVE ALL TIMESTAMPS: Every input timestamp MUST appear in output
+2. CHRONOLOGICAL ORDER: Output timestamps MUST be in ascending order
+3. MERGING: You MAY merge consecutive segments that share the same mergeable_window_id
+   - When merging, use the EARLIEST timestamp
+   - Combine texts naturally into one sentence/paragraph
+4. SECTION ORGANIZATION: Group related content under meaningful ## section titles
+5. TEXT CLEANUP:
+   - Remove filler words: "um", "uh", "you know", "like", "kind of"
+   - Fix grammatical errors
+   - Make sentences flow naturally
+   - Preserve technical accuracy
+6. OUTPUT: Return ONLY the JSON. No markdown, no explanations, just the JSON object
+
+INPUT SEGMENTS ({len(json_segments)} total):
+{json.dumps(json_segments, indent=2)}
+
+Remember:
+- Output must be VALID JSON
+- All {len(json_segments)} input timestamps must appear in output
+- Timestamps must be in ascending chronological order
+- Use earliest timestamp when merging segments"""
+
+        response = self._generate_content(prompt, max_tokens=32000, temperature=0.2)
+        response_text = self._safe_extract_response_text(response)
+
+        logger.info(f"📝 Received JSON response from LLM ({len(response_text)} chars)")
+
+        return response_text
+
+    def _parse_and_validate_json_response(self, response_text: str, input_segments: List[Dict]) -> List[Dict]:
+        """Parse JSON response from LLM and validate timestamp preservation.
+
+        Args:
+            response_text: Raw response from LLM (should contain JSON)
+            input_segments: Original input segments for validation
+
+        Returns:
+            Parsed and validated list of segments
+
+        Raises:
+            ValueError: If JSON is invalid or validation fails
+        """
+        import json
+        import re
+
+        # Try to extract JSON from response (LLM might add markdown code blocks)
+        json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+        if json_match:
+            json_str = json_match.group(1)
+            logger.info("📦 Extracted JSON from markdown code block")
+        else:
+            # Try to find JSON object directly
+            json_match = re.search(r'\{.*"segments".*\}', response_text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+                logger.info("📦 Extracted JSON object from response")
+            else:
+                json_str = response_text.strip()
+
+        # Parse JSON
+        try:
+            parsed = json.loads(json_str)
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ Failed to parse JSON response: {e}")
+            logger.error(f"Response preview: {response_text[:500]}...")
+            raise ValueError(f"LLM did not return valid JSON: {e}")
+
+        # Extract segments array
+        if 'segments' not in parsed:
+            raise ValueError("JSON response missing required 'segments' array")
+
+        output_segments = parsed['segments']
+
+        if not isinstance(output_segments, list):
+            raise ValueError("'segments' must be a JSON array")
+
+        logger.info(f"✅ Parsed JSON: {len(output_segments)} segments")
+
+        # Validate each segment has required fields
+        for i, segment in enumerate(output_segments):
+            if 'timestamp' not in segment:
+                raise ValueError(f"Segment {i} missing required 'timestamp' field")
+            if 'text' not in segment:
+                raise ValueError(f"Segment {i} missing required 'text' field")
+            if 'section_title' not in segment:
+                raise ValueError(f"Segment {i} missing required 'section_title' field")
+
+        # Validate all input timestamps are present in output
+        input_timestamps = set(s['timestamp'] for s in input_segments)
+        output_timestamps = set(s['timestamp'] for s in output_segments)
+
+        missing_timestamps = input_timestamps - output_timestamps
+        if missing_timestamps:
+            missing_sorted = sorted(list(missing_timestamps))[:10]  # Show first 10
+            logger.error(f"❌ Missing {len(missing_timestamps)} timestamps in output!")
+            logger.error(f"   First missing: {missing_sorted}")
+            raise ValueError(f"LLM dropped {len(missing_timestamps)} timestamps. Output must include ALL input timestamps.")
+
+        # Validate chronological order
+        prev_timestamp = -1
+        for i, segment in enumerate(output_segments):
+            timestamp = segment['timestamp']
+            if timestamp < prev_timestamp:
+                logger.error(f"❌ Timestamps out of order at segment {i}: {prev_timestamp} → {timestamp}")
+                raise ValueError(f"Timestamps must be in chronological order. Found {timestamp} after {prev_timestamp}")
+            prev_timestamp = timestamp
+
+        logger.info(f"✅ Validation passed:")
+        logger.info(f"   - All {len(input_timestamps)} input timestamps present")
+        logger.info(f"   - Chronological order maintained")
+        logger.info(f"   - Merged from {len(input_segments)} to {len(output_segments)} segments")
+
+        return output_segments
+
+    def _convert_json_to_sections(self, validated_segments: List[Dict]) -> tuple[str, List[Dict]]:
+        """Convert validated JSON segments to sections with accurate timestamp boundaries.
+
+        Args:
+            validated_segments: List of validated segments from LLM
+
+        Returns:
+            Tuple of (formatted_content, sections_list)
+            - formatted_content: Markdown blog post content
+            - sections_list: List of section dicts with start_time, end_time, title, content, paragraphs
+        """
+        sections = []
+        current_section = None
+        section_segments = []
+
+        # Group consecutive segments by section_title
+        for segment in validated_segments:
+            section_title = segment['section_title'].strip()
+            timestamp = segment['timestamp']
+            text = segment['text'].strip()
+
+            if current_section is None or current_section != section_title:
+                # Save previous section if it exists
+                if current_section and section_segments:
+                    # Build content from segments
+                    content_lines = [seg['text'] for seg in section_segments]
+                    content = '\n\n'.join(content_lines)
+
+                    section_dict = {
+                        'title': current_section,
+                        'start_time': section_segments[0]['timestamp'],
+                        'end_time': section_segments[-1]['timestamp'],
+                        'content': content,
+                        'segments': section_segments  # Keep for reference
+                    }
+
+                    sections.append(section_dict)
+
+                # Start new section
+                current_section = section_title
+                section_segments = []
+
+            # Add segment to current section
+            section_segments.append({
+                'timestamp': timestamp,
+                'text': text
+            })
+
+        # Don't forget the last section
+        if current_section and section_segments:
+            content_lines = [seg['text'] for seg in section_segments]
+            content = '\n\n'.join(content_lines)
+
+            section_dict = {
+                'title': current_section,
+                'start_time': section_segments[0]['timestamp'],
+                'end_time': section_segments[-1]['timestamp'],
+                'content': content,
+                'segments': section_segments
+            }
+
+            sections.append(section_dict)
+
+        logger.info(f"📚 Created {len(sections)} sections from validated segments:")
+        for i, section in enumerate(sections):
+            logger.info(f"   {i+1}. \"{section['title']}\" ({section['start_time']:.1f}s - {section['end_time']:.1f}s)")
+
+        # Now break each section's content into paragraphs
+        # Import from hybrid_blog_creator if available, or create simple paragraphs
+        for section in sections:
+            # Simple paragraph breaking: split on double newlines
+            paragraphs_text = section['content'].split('\n\n')
+
+            # Calculate time per paragraph (distribute evenly)
+            total_duration = section['end_time'] - section['start_time']
+            if len(paragraphs_text) > 0:
+                time_per_paragraph = total_duration / len(paragraphs_text)
+            else:
+                time_per_paragraph = total_duration
+
+            paragraphs = []
+            for i, para_text in enumerate(paragraphs_text):
+                if para_text.strip():
+                    para_start = section['start_time'] + (i * time_per_paragraph)
+                    para_end = para_start + time_per_paragraph
+
+                    paragraphs.append({
+                        'text': para_text.strip(),
+                        'start_time': para_start,
+                        'end_time': para_end
+                    })
+
+            section['paragraphs'] = paragraphs
+            logger.debug(f"   Section '{section['title']}' has {len(paragraphs)} paragraphs")
+
+        # Generate formatted markdown content
+        formatted_lines = []
+
+        for section in sections:
+            # Add section header
+            formatted_lines.append(f"## {section['title']}\n")
+
+            # Add content
+            formatted_lines.append(f"{section['content']}\n")
+
+            # Add spacing between sections
+            formatted_lines.append("\n")
+
+        formatted_content = '\n'.join(formatted_lines)
+
+        return formatted_content, sections
+
     def _format_as_blog_post_with_boundaries(self, content: str, title: str) -> str:
         """Format content as blog post while preserving timestamp boundaries."""
 
