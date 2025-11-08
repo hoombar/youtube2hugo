@@ -68,7 +68,7 @@ class HybridBlogCreator:
                 data = request.json
                 video_path = data['video_path']
                 title = data.get('title', '')
-                processing_mode = data.get('processing_mode', 'smart')
+                processing_mode = data.get('processing_mode', 'raw')
                 
                 session_data = self.create_blog_session(video_path, title, processing_mode)
                 return jsonify(session_data)
@@ -113,7 +113,7 @@ class HybridBlogCreator:
                 logger.error(f"Error generating blog: {e}")
                 return jsonify({'error': str(e)}), 500
     
-    def create_blog_session(self, video_path: str, title: str, processing_mode: str = 'smart') -> Dict:
+    def create_blog_session(self, video_path: str, title: str, processing_mode: str = 'raw') -> Dict:
         """Create a new blog creation session."""
         logger.info(f"🎬 Creating blog session for: {video_path}")
         
@@ -646,7 +646,7 @@ class HybridBlogCreator:
         
         return content
     
-    def _extract_frames_by_section(self, video_path: str, sections: List[Dict], session_dir: str, processing_mode: str = 'smart') -> List[Dict]:
+    def _extract_frames_by_section(self, video_path: str, sections: List[Dict], session_dir: str, processing_mode: str = 'raw') -> List[Dict]:
         """Extract candidate frames for each section."""
         frames_dir = os.path.join(session_dir, 'frames')
         os.makedirs(frames_dir, exist_ok=True)
