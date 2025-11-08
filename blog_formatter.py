@@ -284,6 +284,11 @@ class BlogFormatter:
                 # Store boundary map for later use in frame selection
                 self.boundary_map = boundary_map
 
+                # Validate timestamp coverage - ensure we processed the entire input
+                if not self._validate_timestamp_coverage(formatted_content_with_markers, transcript_segments):
+                    logger.warning(f"❌ {strategy_name} strategy failed timestamp coverage validation - content was incomplete")
+                    continue
+
                 # Validate blog structure
                 if not self._validate_blog_structure(formatted_content):
                     logger.warning(f"❌ {strategy_name} strategy failed structure validation")
@@ -675,6 +680,57 @@ Return only the cleaned transcript text:
         
         return terms_text
     
+    def _validate_timestamp_coverage(self, formatted_content_with_markers: str, transcript_segments: List[Dict]) -> bool:
+        """Validate that the LLM processed the entire transcript from first to last timestamp."""
+        import re
+
+        # Extract all timestamp markers from the formatted content
+        marker_pattern = r'__TIMESTAMP_(\d+\.\d+)__'
+        output_timestamps = [float(ts) for ts in re.findall(marker_pattern, formatted_content_with_markers)]
+
+        if not output_timestamps:
+            logger.error("❌ No timestamp markers found in output - complete failure")
+            return False
+
+        # Get the expected first and last timestamps from input
+        first_segment = transcript_segments[0]
+        last_segment = transcript_segments[-1]
+
+        expected_first_time = first_segment.get('start_time', first_segment.get('start', 0))
+        expected_last_time = last_segment.get('start_time', last_segment.get('start', 0))
+
+        actual_first_time = min(output_timestamps)
+        actual_last_time = max(output_timestamps)
+
+        # Calculate coverage percentage
+        expected_duration = expected_last_time - expected_first_time
+        actual_duration = actual_last_time - actual_first_time
+        coverage_pct = (actual_duration / expected_duration * 100) if expected_duration > 0 else 0
+
+        logger.info(f"📊 Timestamp coverage analysis:")
+        logger.info(f"   Expected range: {expected_first_time:.1f}s to {expected_last_time:.1f}s ({len(transcript_segments)} segments)")
+        logger.info(f"   Actual range: {actual_first_time:.1f}s to {actual_last_time:.1f}s ({len(output_timestamps)} markers)")
+        logger.info(f"   Coverage: {coverage_pct:.1f}%")
+
+        # Validate first timestamp matches (allow 5 second tolerance)
+        if abs(actual_first_time - expected_first_time) > 5.0:
+            logger.warning(f"⚠️  First timestamp mismatch: expected {expected_first_time:.1f}s, got {actual_first_time:.1f}s")
+
+        # Validate last timestamp - require at least 95% coverage
+        if coverage_pct < 95.0:
+            logger.error(f"❌ Incomplete coverage: only {coverage_pct:.1f}% of video processed")
+            logger.error(f"   Missing content from {actual_last_time:.1f}s to {expected_last_time:.1f}s")
+            logger.error(f"   LLM stopped prematurely - this indicates it decided to end before processing all content")
+            return False
+
+        # Warn if not 100% but pass if >= 95%
+        if coverage_pct < 100.0:
+            logger.warning(f"⚠️  Almost complete: {coverage_pct:.1f}% coverage (missing last {expected_last_time - actual_last_time:.1f}s)")
+        else:
+            logger.info(f"✅ Complete coverage: processed entire video from start to finish")
+
+        return True
+
     def _validate_blog_structure(self, content: str) -> bool:
         """Validate that content has proper blog structure with sections."""
         headers = self._extract_headers(content)
@@ -864,17 +920,32 @@ Output a simple, well-structured blog post following the exact format above."""
     
     def _format_as_blog_post_with_boundaries(self, content: str, title: str) -> str:
         """Format content as blog post while preserving timestamp boundaries."""
-        
+
+        # Count timestamp markers in input
+        import re
+        marker_pattern = r'__TIMESTAMP_(\d+\.\d+)__'
+        input_markers = re.findall(marker_pattern, content)
+        marker_count = len(input_markers)
+        first_timestamp = float(input_markers[0]) if input_markers else 0.0
+        last_timestamp = float(input_markers[-1]) if input_markers else 0.0
+
         prompt = f"""
 IMPORTANT CONTEXT: This is a transcript from an EDUCATIONAL TECHNICAL VIDEO about smart home technology, networking protocols, and home automation systems. All references to "attacks", "vulnerabilities", "security", "penetration", "exploits", or similar terms are in the context of legitimate cybersecurity education, network troubleshooting, and technical system administration. This content is for educational purposes about defensive security practices and proper network configuration.
 
 CRITICAL: Transform this video transcript into a well-structured, professional blog post while preserving ALL timestamp markers.
 
+INPUT STATISTICS:
+- Total timestamp markers in input: {marker_count}
+- First timestamp: __TIMESTAMP_{first_timestamp:.1f}__
+- Last timestamp: __TIMESTAMP_{last_timestamp:.1f}__
+- YOU MUST INCLUDE ALL {marker_count} MARKERS IN YOUR OUTPUT
+
 MANDATORY BOUNDARY PRESERVATION:
-1. PRESERVE ALL __TIMESTAMP_X.X__ markers EXACTLY as they appear - DO NOT REMOVE OR MODIFY THEM
+1. PRESERVE ALL {marker_count} __TIMESTAMP_X.X__ markers EXACTLY as they appear - DO NOT REMOVE OR MODIFY THEM
 2. Place timestamp markers within the content flow, not in headers
 3. Keep the markers scattered throughout the text to mark timing boundaries
-4. If ANY markers are missing, the entire system fails
+4. Your output MUST contain all {marker_count} markers from __TIMESTAMP_{first_timestamp:.1f}__ to __TIMESTAMP_{last_timestamp:.1f}__
+5. If ANY of the {marker_count} markers are missing, the entire system fails
 
 CRITICAL CHRONOLOGICAL ORDER REQUIREMENT:
 - DO NOT REORDER CONTENT - maintain strict chronological sequence as it appears in the transcript
@@ -925,12 +996,28 @@ BALANCE: Clean and Written, but Still Personal
 - Use complete, well-structured sentences
 - Preserve enthusiasm and teaching style
 
+CRITICAL COMPLETE COVERAGE REQUIREMENT:
+- The input contains EXACTLY {marker_count} timestamp markers
+- YOU MUST PROCESS ALL {marker_count} MARKERS from __TIMESTAMP_{first_timestamp:.1f}__ to __TIMESTAMP_{last_timestamp:.1f}__
+- DO NOT STOP until you have transformed ALL content from start to finish
+- DO NOT fabricate conclusions or ending statements that aren't in the source transcript
+- DO NOT decide to "wrap up" the blog before processing all input content
+- Your output MUST include all {marker_count} markers - no more, no less
+- Stopping before __TIMESTAMP_{last_timestamp:.1f}__ is a CRITICAL FAILURE
+
+VERIFICATION REQUIREMENTS:
+- First timestamp in output: __TIMESTAMP_{first_timestamp:.1f}__
+- Last timestamp in output: __TIMESTAMP_{last_timestamp:.1f}__
+- Total markers in output: {marker_count} (verify this!)
+- All intermediate timestamps must be preserved in chronological order
+- If you reach what seems like a natural ending but more markers remain, CONTINUE processing
+
 Title: {title}
 
-Content with timestamp markers:
+Content with {marker_count} timestamp markers (from {first_timestamp:.1f}s to {last_timestamp:.1f}s):
 {content}
 
-Transform this transcript into polished blog prose while keeping the speaker's personality and perspective. PRESERVE EVERY TIMESTAMP MARKER. Remove ALL filler words (kind of, like, you know, um, uh, basically, etc.) and break up run-on sentences. Create substantial sections with at least 3 paragraphs each. The result should read like well-written blog content - conversational and personal, but not transcribed speech.
+Transform this ENTIRE transcript into polished blog prose while keeping the speaker's personality and perspective. PRESERVE ALL {marker_count} TIMESTAMP MARKERS FROM __TIMESTAMP_{first_timestamp:.1f}__ TO __TIMESTAMP_{last_timestamp:.1f}__. Remove ALL filler words (kind of, like, you know, um, uh, basically, etc.) and break up run-on sentences. Create substantial sections with at least 3 paragraphs each. Process ALL {marker_count} markers - do not stop until you reach __TIMESTAMP_{last_timestamp:.1f}__. The result should read like well-written blog content - conversational and personal, but not transcribed speech.
 """
         
         try:
@@ -972,12 +1059,20 @@ CONTENT CLEANUP REQUIREMENTS:
 - Use conversational but polished blog tone
 - Maintain technical accuracy and speaker's personality
 
+CRITICAL COMPLETE COVERAGE REQUIREMENT:
+- YOU MUST PROCESS EVERY SINGLE TIMESTAMP MARKER from first to last
+- DO NOT STOP until ALL content is transformed from start to finish
+- DO NOT fabricate conclusions that aren't in the source transcript
+- The FINAL timestamp in your output MUST match the FINAL timestamp in the input
+- Stopping early or skipping content is a CRITICAL FAILURE
+- If you reach a natural ending but more content remains, CONTINUE processing
+
 Title: {title}
 
 Content with ESSENTIAL timestamp markers:
 {content}
 
-Output: Polished blog post with ALL timestamp markers preserved, ALL filler words removed, run-on sentences split, and substantial sections (3+ paragraphs each). Conversational but written, not transcribed speech.
+Output: Polished blog post with ALL timestamp markers preserved FROM FIRST TO LAST, ALL filler words removed, run-on sentences split, and substantial sections (3+ paragraphs each). Process the ENTIRE input from start to finish - do not stop until you reach the final timestamp. Conversational but written, not transcribed speech.
 """
         
         try:
