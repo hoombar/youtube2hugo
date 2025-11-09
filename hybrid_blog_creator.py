@@ -528,8 +528,7 @@ class HybridBlogCreator:
         for section in sections:
             content += f"## {section['title']}\n\n"
             content += f"{section['content']}\n\n"
-            content += "{{< image-placeholder >}}\n\n"
-        
+
         return content
     
     def _create_enhanced_basic_sections_from_transcript(self, transcript_segments: List[Dict]) -> List[Dict]:
@@ -647,8 +646,7 @@ class HybridBlogCreator:
         for section in sections:
             content += f"## {section['title']}\n\n"
             content += f"{section['content']}\n\n"
-            content += "{{< image-placeholder >}}\n\n"
-        
+
         return content
     
     def _extract_frames_by_section(self, video_path: str, sections: List[Dict], session_dir: str, processing_mode: str = 'raw') -> List[Dict]:
