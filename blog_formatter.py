@@ -254,17 +254,20 @@ class BlogFormatter:
         logger.info(f"📊 JSON transcript size: ~{json_size_estimate:,} characters")
 
         # Step 2: Apply technical corrections to text fields
+        logger.info(f"📝 Applying technical corrections to {len(json_segments)} segments...")
         for segment in json_segments:
-            segment['text'] = self._apply_technical_corrections(segment['text'])
+            segment['text'] = self._apply_technical_corrections(segment['text'], silent=True)
+        logger.info(f"✅ Applied {len(self.technical_terms)} technical term corrections across all segments")
 
         # Step 3: Encode sensitive terms if using Gemini
         code_map = {}
         if self.provider == 'gemini':
-            logger.info("🔒 Encoding sensitive terms to bypass Gemini safety filters...")
+            logger.info(f"🔒 Encoding sensitive terms across {len(json_segments)} segments...")
             for segment in json_segments:
-                encoded_text, segment_code_map = self._encode_sensitive_terms(segment['text'])
+                encoded_text, segment_code_map = self._encode_sensitive_terms(segment['text'], silent=True)
                 segment['text'] = encoded_text
                 code_map.update(segment_code_map)
+            logger.info(f"✅ Encoded {len(code_map)} unique sensitive terms across all segments")
 
         # Step 4: Send to LLM for formatting
         logger.info(f"🤖 Sending {len(json_segments)} segments to LLM for JSON-based formatting...")
@@ -890,11 +893,16 @@ Output a simple, well-structured blog post following the exact format above."""
         
         return ' '.join(text_parts)
     
-    def _apply_technical_corrections(self, content: str) -> str:
-        """Apply technical term corrections to content."""
-        
+    def _apply_technical_corrections(self, content: str, silent: bool = False) -> str:
+        """Apply technical term corrections to content.
+
+        Args:
+            content: Text content to apply corrections to
+            silent: If True, suppress logging (useful when calling in batch)
+        """
+
         corrected_content = content
-        
+
         # Apply technical terms corrections
         for correct_term, variations in self.technical_terms.items():
             for variation in variations:
@@ -902,12 +910,18 @@ Output a simple, well-structured blog post following the exact format above."""
                 import re
                 pattern = re.compile(re.escape(variation), re.IGNORECASE)
                 corrected_content = pattern.sub(correct_term, corrected_content)
-        
-        logger.info(f"Applied {len(self.technical_terms)} technical term corrections")
+
+        if not silent:
+            logger.info(f"Applied {len(self.technical_terms)} technical term corrections")
         return corrected_content
 
-    def _encode_sensitive_terms(self, content: str) -> tuple[str, Dict[str, str]]:
-        """Replace problematic words with codes before sending to Gemini."""
+    def _encode_sensitive_terms(self, content: str, silent: bool = False) -> tuple[str, Dict[str, str]]:
+        """Replace problematic words with codes before sending to Gemini.
+
+        Args:
+            content: Text content to encode
+            silent: If True, suppress logging (useful when calling in batch)
+        """
         import re
 
         code_map = {}  # Maps codes to original words
@@ -930,7 +944,8 @@ Output a simple, well-structured blog post following the exact format above."""
 
                 code_counter += 1
 
-        logger.info(f"🔒 Encoded {len(code_map)} sensitive terms for Gemini safety bypass")
+        if not silent:
+            logger.info(f"🔒 Encoded {len(code_map)} sensitive terms for Gemini safety bypass")
         return encoded_content, code_map
 
     def _decode_sensitive_terms(self, content: str, code_map: Dict[str, str]) -> str:
@@ -1096,11 +1111,14 @@ JSON SCHEMA (REQUIRED):
 }}
 
 STRICT RULES:
-1. PRESERVE ALL TIMESTAMPS: Every input timestamp MUST appear in output
+1. COMPLETE TIME COVERAGE: All time ranges must be covered in output
+   - Each 10-second window (mergeable_window_id) must have at least one timestamp
+   - You MAY drop intermediate timestamps when merging within a window
 2. CHRONOLOGICAL ORDER: Output timestamps MUST be in ascending order
 3. MERGING: You MAY merge consecutive segments that share the same mergeable_window_id
-   - When merging, use the EARLIEST timestamp
+   - When merging, ALWAYS use the EARLIEST timestamp from the merged group
    - Combine texts naturally into one sentence/paragraph
+   - This will result in fewer output segments than input (which is expected and good!)
 4. SECTION ORGANIZATION: Group related content under meaningful ## section titles
 5. TEXT CLEANUP:
    - Remove filler words: "um", "uh", "you know", "like", "kind of"
@@ -1114,9 +1132,9 @@ INPUT SEGMENTS ({len(json_segments)} total):
 
 Remember:
 - Output must be VALID JSON
-- All {len(json_segments)} input timestamps must appear in output
+- Cover all time windows (each mergeable_window_id must be represented)
 - Timestamps must be in ascending chronological order
-- Use earliest timestamp when merging segments"""
+- Merging segments is ENCOURAGED to create natural, flowing text"""
 
         response = self._generate_content(prompt, max_tokens=32000, temperature=0.2)
         response_text = self._safe_extract_response_text(response)
@@ -1183,18 +1201,7 @@ Remember:
             if 'section_title' not in segment:
                 raise ValueError(f"Segment {i} missing required 'section_title' field")
 
-        # Validate all input timestamps are present in output
-        input_timestamps = set(s['timestamp'] for s in input_segments)
-        output_timestamps = set(s['timestamp'] for s in output_segments)
-
-        missing_timestamps = input_timestamps - output_timestamps
-        if missing_timestamps:
-            missing_sorted = sorted(list(missing_timestamps))[:10]  # Show first 10
-            logger.error(f"❌ Missing {len(missing_timestamps)} timestamps in output!")
-            logger.error(f"   First missing: {missing_sorted}")
-            raise ValueError(f"LLM dropped {len(missing_timestamps)} timestamps. Output must include ALL input timestamps.")
-
-        # Validate chronological order
+        # Validate chronological order first
         prev_timestamp = -1
         for i, segment in enumerate(output_segments):
             timestamp = segment['timestamp']
@@ -1203,10 +1210,34 @@ Remember:
                 raise ValueError(f"Timestamps must be in chronological order. Found {timestamp} after {prev_timestamp}")
             prev_timestamp = timestamp
 
+        # Validate window coverage (accept merged timestamps)
+        # Build set of mergeable windows from input
+        input_windows = set(s.get('mergeable_window_id', int(s['timestamp'] // 10)) for s in input_segments)
+
+        # Build set of windows covered by output timestamps
+        output_windows = set()
+        for segment in output_segments:
+            timestamp = segment['timestamp']
+            window_id = int(timestamp // 10)
+            output_windows.add(window_id)
+
+        # Check that all input windows are represented in output
+        missing_windows = input_windows - output_windows
+        if missing_windows:
+            missing_sorted = sorted(list(missing_windows))[:10]
+            logger.error(f"❌ Missing coverage for {len(missing_windows)} time windows!")
+            logger.error(f"   First missing windows (×10s): {missing_sorted}")
+            raise ValueError(f"Output missing {len(missing_windows)} time windows. All time ranges must be covered.")
+
+        # Log validation success
+        input_timestamps = set(s['timestamp'] for s in input_segments)
+        output_timestamps = set(s['timestamp'] for s in output_segments)
+        merged_count = len(input_timestamps) - len(output_timestamps)
+
         logger.info(f"✅ Validation passed:")
-        logger.info(f"   - All {len(input_timestamps)} input timestamps present")
+        logger.info(f"   - All {len(input_windows)} time windows covered (10-second intervals)")
         logger.info(f"   - Chronological order maintained")
-        logger.info(f"   - Merged from {len(input_segments)} to {len(output_segments)} segments")
+        logger.info(f"   - Merged from {len(input_segments)} to {len(output_segments)} segments ({merged_count} merged)")
 
         return output_segments
 
