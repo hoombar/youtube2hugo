@@ -455,9 +455,10 @@
                 <option value="smart">Smart frame selection (slowest - analyzes quality, filters bad frames)</option>
                 <option value="dedupe">Remove duplicates (medium - extracts every 1s, removes similar frames)</option>
                 <option value="raw" selected>No processing (fastest - every 1 second, all frames)</option>
+                <option value="text-only">Text-only (no frame extraction - for debugging/quick iterations)</option>
             </select>
             <small style="color: #666; display: block; margin-top: 5px;">
-                Choose your balance between speed and frame quality filtering
+                Choose your balance between speed and frame quality filtering. Text-only mode skips all frame extraction.
             </small>
         </div>
         <button class="btn" onclick="processVideo()" id="process-btn">🚀 Process Video & Create Sections</button>
@@ -518,9 +519,19 @@
             const processingMessages = {
                 'smart': 'AI Processing + Smart Frame Analysis...',
                 'dedupe': 'AI Processing + Duplicate Removal...',
-                'raw': 'AI Processing + Fast Frame Extraction...'
+                'raw': 'AI Processing + Fast Frame Extraction...',
+                'text-only': 'AI Processing (Text-Only - No Frames)...'
             };
             processingStatus.querySelector('p strong').textContent = processingMessages[processingMode];
+
+            // Update subtitle based on mode
+            const subtitleMessages = {
+                'smart': 'Extracting transcript → Cleaning technical terms → Creating sections → Extracting frames',
+                'dedupe': 'Extracting transcript → Cleaning technical terms → Creating sections → Extracting frames',
+                'raw': 'Extracting transcript → Cleaning technical terms → Creating sections → Extracting frames',
+                'text-only': 'Extracting transcript → Cleaning technical terms → Creating sections (no frames)'
+            };
+            processingStatus.querySelector('p small').textContent = subtitleMessages[processingMode];
             
             processBtn.disabled = true;
             processingStatus.style.display = 'block';
@@ -544,6 +555,19 @@
                 }
                 
                 sessionData = await response.json();
+
+                // Check if AI processing failed and show warning
+                if (sessionData.ai_processing_success === false && sessionData.ai_error_message) {
+                    const warningDiv = document.createElement('div');
+                    warningDiv.style.cssText = 'background: #fff3cd; border: 2px solid #ffc107; color: #856404; padding: 15px; margin-bottom: 20px; border-radius: 8px; font-weight: 500;';
+                    warningDiv.innerHTML = `
+                        <strong>⚠️ AI Processing Failed</strong><br>
+                        <span style="font-weight: normal;">${sessionData.ai_error_message}</span><br>
+                        <span style="font-size: 0.9em; font-weight: normal; font-style: italic;">Showing fallback content (basic transcript formatting). The sections below may not be well-formatted.</span>
+                    `;
+                    document.getElementById('step2').prepend(warningDiv);
+                }
+
                 showSectionSelection();
                 
             } catch (error) {
@@ -622,7 +646,7 @@
                             </div>
                             
                             <div class="paragraph-content" style="margin-bottom: 15px;">
-                                <p style="white-space: pre-wrap; line-height: 1.6; margin: 0; font-size: 0.95em;">${paragraph.content}</p>
+                                <p style="white-space: pre-wrap; line-height: 1.6; margin: 0; font-size: 0.95em;">${paragraph.text}</p>
                             </div>
                             
                             <h6 style="margin: 10px 0 5px 0; color: #555;">🖼️ Select frames for this paragraph (max 3):</h6>

@@ -116,7 +116,11 @@ class HybridBlogCreator:
     def create_blog_session(self, video_path: str, title: str, processing_mode: str = 'raw') -> Dict:
         """Create a new blog creation session."""
         logger.info(f"🎬 Creating blog session for: {video_path}")
-        
+
+        # Clear any previous error flags
+        self._ai_processing_failed = False
+        self._ai_error_message = None
+
         # Create session
         session_id = f"{Path(video_path).stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         session_dir = os.path.join(self.sessions_dir, session_id)
@@ -186,6 +190,10 @@ class HybridBlogCreator:
         except (SystemExit, ValueError) as e:
             logger.error(f"❌ AI processing failed ({type(e).__name__}: {e})")
 
+            # Set flags for session data
+            self._ai_processing_failed = True
+            self._ai_error_message = str(e)
+
             error_str = str(e).lower()
 
             # Check if it's an API key or quota error
@@ -197,14 +205,22 @@ class HybridBlogCreator:
                 logger.error(f"   2. Generate a new key at https://aistudio.google.com/apikey")
                 logger.error(f"   3. Update config.local.yaml with the new key")
                 logger.error(f"🚨 The system will create basic sections but content will be transcript-like")
+                self._ai_error_message = "API Authentication Error: Check your Gemini API key configuration"
             elif "safety filter" in error_str or "All prompting strategies failed" in error_str:
                 logger.error(f"🚨 GEMINI SAFETY FILTER: The video content triggered Gemini's safety filters")
                 logger.error(f"💡 Multiple prompting strategies were attempted but all were blocked")
                 logger.error(f"📝 This is usually due to technical content being misidentified as potentially harmful")
                 logger.error(f"🔧 The system will create basic sections but content will be transcript-like")
                 logger.error(f"⚠️  Consider: 1) Using a different video, 2) Different AI service, 3) Manual editing")
+                self._ai_error_message = "Safety Filter Blocked: Gemini blocked the content due to safety filters"
+            elif "missing" in error_str and "time windows" in error_str:
+                logger.error(f"⏱️  TIMESTAMP COVERAGE ERROR: LLM merged too aggressively and skipped time ranges")
+                logger.error(f"💡 The LLM was supposed to cover all time ranges but missed some")
+                logger.error(f"🔧 The system will create basic sections but content will be transcript-like")
+                self._ai_error_message = "Timestamp Coverage Error: LLM skipped some time ranges while merging"
             else:
                 logger.error(f"❓ UNKNOWN ERROR: {e}")
+                self._ai_error_message = f"Unknown Error: {str(e)[:100]}"
 
             logger.error(f"⚠️  This failure should NOT be affected by processing_mode: {processing_mode}")
             logger.error(f"🚨 IMPORTANT: User will see transcript-like content instead of blog content!")
@@ -226,34 +242,52 @@ class HybridBlogCreator:
                 logger.error(f"Fallback sectioning also failed: {fallback_error}")
                 raise ValueError(f"Both AI and fallback sectioning failed: {fallback_error}")
         
-        # Step 3: Extract candidate frames for each section
-        processing_messages = {
-            'smart': "🖼️ Extracting candidate frames with smart processing...",
-            'dedupe': "🔄 Extracting frames every 0.5s and removing duplicates...",
-            'raw': "⚡ Extracting raw frames every 0.5 seconds..."
-        }
-        logger.info(processing_messages[processing_mode])
-        
-        try:
-            frames_data = self._extract_frames_by_section(video_path, sections, session_dir, processing_mode)
-            total_frames = sum(len(fd['frames']) for fd in frames_data)
-            logger.info(f"🖼️ Frame extraction completed: {total_frames} total frames across {len(frames_data)} sections")
-        except Exception as frame_error:
-            logger.error(f"Frame extraction failed: {frame_error}")
-            # Create empty frames data to prevent session failure
+        # Step 3: Extract candidate frames for each section (skip for text-only mode)
+        if processing_mode == 'text-only':
+            logger.info("📝 Text-only mode: Skipping frame extraction for faster iterations")
+            # Create empty frames data structure but keep sections intact
             frames_data = []
             for i, section in enumerate(sections):
                 frames_data.append({
-                    'section_title': section['title'],
                     'section_index': i,
+                    'section_title': section['title'],
                     'start_time': section['start_time'],
                     'end_time': section['end_time'],
-                    'frames': [],
+                    'frames': [],  # No frames for text-only mode
                     'frame_count': 0
                 })
-            logger.warning("Created empty frames data due to extraction failure")
+        else:
+            processing_messages = {
+                'smart': "🖼️ Extracting candidate frames with smart processing...",
+                'dedupe': "🔄 Extracting frames every 0.5s and removing duplicates...",
+                'raw': "⚡ Extracting raw frames every 0.5 seconds..."
+            }
+            logger.info(processing_messages[processing_mode])
+
+            try:
+                frames_data = self._extract_frames_by_section(video_path, sections, session_dir, processing_mode)
+                total_frames = sum(len(fd['frames']) for fd in frames_data)
+                logger.info(f"🖼️ Frame extraction completed: {total_frames} total frames across {len(frames_data)} sections")
+            except Exception as frame_error:
+                logger.error(f"Frame extraction failed: {frame_error}")
+                # Create empty frames data to prevent session failure
+                frames_data = []
+                for i, section in enumerate(sections):
+                    frames_data.append({
+                        'section_title': section['title'],
+                        'section_index': i,
+                        'start_time': section['start_time'],
+                        'end_time': section['end_time'],
+                        'frames': [],
+                        'frame_count': 0
+                    })
+                logger.warning("Created empty frames data due to extraction failure")
         
         # Step 4: Create session data
+        # Determine if AI processing was successful
+        ai_success = len([s for s in sections if 'paragraphs' in s and len(s.get('content', '')) > 100]) > 0
+        ai_used_fallback = hasattr(self, '_ai_processing_failed') and self._ai_processing_failed
+
         session_data = {
             'session_id': session_id,
             'video_path': video_path,
@@ -263,7 +297,8 @@ class HybridBlogCreator:
             'frames_data': frames_data,
             'blog_content_template': blog_content,
             'created_at': datetime.now().isoformat(),
-            'ai_processing_success': len([s for s in sections if 'paragraphs' in s and len(s.get('content', '')) > 100]) > 0
+            'ai_processing_success': ai_success and not ai_used_fallback,
+            'ai_error_message': getattr(self, '_ai_error_message', None) if ai_used_fallback else None
         }
         
         # Save session
@@ -284,7 +319,9 @@ class HybridBlogCreator:
             'sections': sections,
             'frames_data': frames_data,
             'transcript_segments': transcript_segments,  # Include for transcript toggle
-            'title': title
+            'title': title,
+            'ai_processing_success': ai_success and not ai_used_fallback,
+            'ai_error_message': getattr(self, '_ai_error_message', None) if ai_used_fallback else None
         }
     
     def _extract_sections_from_content(self, blog_content: str, boundary_map: Dict) -> List[Dict]:
@@ -436,7 +473,7 @@ class HybridBlogCreator:
         raw_paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
         
         if not raw_paragraphs:
-            return [{'content': content, 'start_time': section_start, 'end_time': section_end}]
+            return [{'text': content, 'start_time': section_start, 'end_time': section_end}]
         
         # Further split paragraphs that are too long (over ~600 characters or 4+ sentences)
         refined_paragraphs = []
@@ -475,7 +512,7 @@ class HybridBlogCreator:
             paragraph_end = section_start + ((i + 1) * paragraph_duration)
             
             paragraphs.append({
-                'content': paragraph_content,
+                'text': paragraph_content,
                 'start_time': paragraph_start,
                 'end_time': paragraph_end
             })
