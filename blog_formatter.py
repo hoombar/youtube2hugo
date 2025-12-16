@@ -1118,13 +1118,11 @@ JSON SCHEMA (REQUIRED):
 }}
 
 STRICT RULES:
-1. COMPLETE TIME COVERAGE: All time ranges must be covered in output
-   - Each 10-second window (mergeable_window_id) must have at least one timestamp
-   - You MAY drop intermediate timestamps when merging within a window
+1. CHRONOLOGICAL ORDER: Output timestamps MUST be in ascending order
+   - Never reorder content from the video's timeline
+   - When merging segments, use the earliest timestamp
 
-2. CHRONOLOGICAL ORDER: Output timestamps MUST be in ascending order
-
-3. SENTENCE COMPLETION - CRITICAL:
+2. SENTENCE COMPLETION - CRITICAL:
    - Input segments from speech recognition are often broken mid-sentence
    - You MUST merge segments to create complete, grammatically correct sentences
    - If you see lowercase text at the start of a segment, it's a continuation - merge it with previous text
@@ -1132,60 +1130,77 @@ STRICT RULES:
    - Example: ["person at the.", "Door if there is"] → "person at the door. If there is"
    - NEVER output text that ends mid-sentence like "person at the."
 
-4. PUNCTUATION - CRITICAL:
+3. PUNCTUATION - CRITICAL:
    - Add proper punctuation (periods, commas, semicolons) to break up long run-on sentences
    - Long sentences (>40 words) should be split into 2-3 shorter sentences with proper punctuation
    - Ensure every sentence ends with proper punctuation (. ! ?)
    - Use commas appropriately for natural reading flow
 
-5. MERGING STRATEGY - IMPORTANT BALANCE:
-   - ONLY merge to complete broken sentences, NOT to create long paragraphs
-   - Target: Keep at least 50-60% of input segments (merge 2-3 short segments into 1)
-   - Each output segment = 1-3 complete sentences (not 4+)
+4. PARAGRAPH CREATION - SEMANTIC COHERENCE:
+   - Each output segment represents ONE PARAGRAPH in the final blog post
+   - MERGE segments that discuss the same idea, concept, or example together
+   - Keep related thoughts together - don't artificially break up coherent narratives
+   - A paragraph should contain a complete thought or concept, regardless of length
+   - Create new paragraphs only when:
+     * The topic or focus clearly shifts to something new
+     * A clear narrative break occurs (new example, new point, new concept)
+     * You're starting a different aspect of the same topic
    - When merging, ALWAYS use the EARLIEST timestamp from the merged group
-   - DON'T merge segments that are already complete and unrelated
+   - Quality over quantity: Better to have fewer substantial paragraphs than many fragmentary ones
+   - Don't worry about time coverage - focus on making each paragraph a coherent unit of thought
 
-6. SECTION TITLES - CRITICAL:
+5. SECTION TITLES - CRITICAL:
    - Create DESCRIPTIVE, MEANINGFUL section titles that describe the content
    - BAD: "Section 2", "Section 3", "Build Overview"
    - GOOD: "Setting Up the Motion-Activated Sprinkler", "Creating the Automation Logic", "Testing and Edge Cases"
    - Each section should cover one main topic/idea
    - Only change section_title at natural topic boundaries, NEVER mid-sentence
 
-7. TEXT CLEANUP:
+6. TEXT CLEANUP:
    - Remove filler words: "um", "uh", "you know", "like", "kind of", "sort of"
    - Fix grammatical errors
    - Make sentences flow naturally with proper punctuation
    - Preserve technical accuracy (product names, technical terms)
 
-8. OUTPUT: Return ONLY the JSON. No markdown, no explanations, just the JSON object
+7. OUTPUT: Return ONLY the JSON. No markdown, no explanations, just the JSON object
 
 INPUT SEGMENTS ({len(json_segments)} total):
 {json.dumps(json_segments, indent=2)}
 
 Remember - CRITICAL REQUIREMENTS:
 - Output must be VALID JSON
-- Cover all time windows (each mergeable_window_id must be represented)
-- Keep at least 50-60% of input segments (e.g., 134 inputs → 60-70 outputs)
+- Focus on SEMANTIC COHERENCE over rigid time coverage
+- Merge related ideas into cohesive paragraphs regardless of time span
 - Timestamps must be in ascending chronological order
 - MERGE incomplete sentences: "person at the." + "Door if" → "person at the door. If"
-- Add proper punctuation to long run-on sentences
-- Each segment = 1-3 well-punctuated sentences (DON'T create long paragraphs)
+- MERGE related thoughts: keep explanations, examples, and narratives together
+- Each segment = one complete thought/concept (could be 3-10 sentences if it's one coherent idea)
 - Section titles must be DESCRIPTIVE (not "Section 2" or generic names)
 - Section changes ONLY at topic boundaries, NEVER mid-sentence
+- Quality > Quantity: Better to have substantial, coherent paragraphs than fragmentary ones
 
-GOOD EXAMPLE (concise, 1-2 sentences):
+GOOD EXAMPLE (keeping related ideas together as one coherent paragraph):
 {{
-  "timestamp": 95.5,
-  "text": "The next solution I tried was a motion-activated sprinkler from Amazon. When it detects motion, it sprays water for a few seconds.",
-  "section_title": "Testing Motion-Activated Deterrents"
+  "timestamp": 40.5,
+  "text": "We have a contact sensor on our chest freezer. If the freezer door is open for too long, it sends a notification to me and my wife. It also announces around the house, asking, 'Hey, you've left the freezer open. Did you mean to do this?' I've applied this same idea to other automations, but in the inverse. For example, if there's been motion in the office and my contact sensor has been closed for 45 minutes, it gives me a nudge to stand up. When this automation kicks in, I receive a notification on my Altrix clock on my desk. It also changes some lights, providing a visual cue that I need to stand up.",
+  "section_title": "Contact Sensors and Duration Triggers"
 }}
 
-BAD EXAMPLE (too long, merged too much):
+BAD EXAMPLE (fragmenting a coherent explanation):
 {{
-  "timestamp": 95.5,
-  "text": "The next solution was a sprinkler from Amazon that sprays when detecting motion, which works well for flower beds, but the problem is it doesn't differentiate between people and cats, so anyone walking by gets wet, and the cats figured out they could avoid it by walking behind it.",
-  "section_title": "Testing Motion-Activated Deterrents"
+  "timestamp": 40.5,
+  "text": "We have a contact sensor on our chest freezer. If the freezer door is open for too long, it sends a notification.",
+  "section_title": "Contact Sensors and Duration Triggers"
+}}
+{{
+  "timestamp": 49.6,
+  "text": "It also announces around the house, asking about the open freezer.",
+  "section_title": "Contact Sensors and Duration Triggers"
+}}
+{{
+  "timestamp": 58.7,
+  "text": "I've applied this to other automations too.",
+  "section_title": "Contact Sensors and Duration Triggers"
 }}"""
 
         response = self._generate_content(prompt, max_tokens=32000, temperature=0.2)
@@ -1262,35 +1277,26 @@ BAD EXAMPLE (too long, merged too much):
                 raise ValueError(f"Timestamps must be in chronological order. Found {timestamp} after {prev_timestamp}")
             prev_timestamp = timestamp
 
-        # Validate window coverage (accept merged timestamps with flexibility)
+        # Log time coverage info (for reference only - not enforced)
         # Build set of mergeable windows from input
         input_windows = set(s.get('mergeable_window_id', int(s['timestamp'] // 10)) for s in input_segments)
 
         # Build set of windows covered by output timestamps
-        # Allow a timestamp to cover adjacent windows (within 15 seconds)
         covered_windows = set()
         for segment in output_segments:
             timestamp = segment['timestamp']
             window_id = int(timestamp // 10)
-            # Cover this window and adjacent windows within 15s
             covered_windows.add(window_id)
             covered_windows.add(window_id - 1)  # Previous window
             covered_windows.add(window_id + 1)  # Next window
 
-        # Check that all input windows are represented in output (with flexibility)
+        # Check coverage but don't enforce it
         missing_windows = input_windows - covered_windows
         if missing_windows:
-            missing_sorted = sorted(list(missing_windows))[:10]
             coverage_pct = ((len(input_windows) - len(missing_windows)) / len(input_windows)) * 100
-
-            # Only error if missing more than 20% of windows
-            if coverage_pct < 80:
-                logger.error(f"❌ Missing coverage for {len(missing_windows)} time windows ({coverage_pct:.1f}% coverage)!")
-                logger.error(f"   First missing windows (×10s): {missing_sorted}")
-                raise ValueError(f"Output missing {len(missing_windows)} time windows ({coverage_pct:.1f}% coverage). Need at least 80% coverage.")
-            else:
-                logger.warning(f"⚠️  Missing {len(missing_windows)} time windows but {coverage_pct:.1f}% coverage is acceptable")
-                logger.warning(f"   Missing windows (×10s): {missing_sorted}")
+            logger.info(f"📊 Time coverage: {coverage_pct:.1f}% ({len(input_windows) - len(missing_windows)}/{len(input_windows)} windows)")
+            if coverage_pct < 60:
+                logger.warning(f"   Note: Some time periods may not be covered, but semantic coherence is prioritized")
 
         # Log validation success
         input_timestamps = set(s['timestamp'] for s in input_segments)
@@ -1298,9 +1304,10 @@ BAD EXAMPLE (too long, merged too much):
         merged_count = len(input_timestamps) - len(output_timestamps)
 
         logger.info(f"✅ Validation passed:")
-        logger.info(f"   - All {len(input_windows)} time windows covered (10-second intervals)")
         logger.info(f"   - Chronological order maintained")
-        logger.info(f"   - Merged from {len(input_segments)} to {len(output_segments)} segments ({merged_count} merged)")
+        logger.info(f"   - Merged from {len(input_segments)} segments to {len(output_segments)} paragraphs")
+        merge_ratio = (len(output_segments) / len(input_segments) * 100) if input_segments else 0
+        logger.info(f"   - Merge ratio: {merge_ratio:.1f}% (focusing on semantic coherence)")
 
         return output_segments
 
@@ -1381,59 +1388,39 @@ BAD EXAMPLE (too long, merged too much):
             logger.info(f"   {i+1}. \"{section['title']}\" ({section['start_time']:.1f}s - {section['end_time']:.1f}s)")
 
         # Now break each section's content into paragraphs
-        # Break continuous text into proper multi-sentence paragraphs
+        # Use LLM segments as natural paragraph boundaries
         for section in sections:
-            # Split content into sentences
             import re
-            content = section['content']
 
-            # Split by sentence-ending punctuation
-            sentences = re.split(r'(?<=[.!?])\s+', content)
-            sentences = [s.strip() for s in sentences if s.strip()]
+            # Get the segments that belong to this section
+            section_segments = section.get('segments', [])
 
-            # Group sentences into paragraphs (3-5 sentences per paragraph)
-            paragraphs_text = []
-            current_paragraph = []
-
-            for sentence in sentences:
-                current_paragraph.append(sentence)
-                # Create a paragraph every 3-5 sentences
-                if len(current_paragraph) >= 3:
-                    paragraphs_text.append(' '.join(current_paragraph))
-                    current_paragraph = []
-
-            # Add remaining sentences as final paragraph
-            if current_paragraph:
-                paragraphs_text.append(' '.join(current_paragraph))
-
-            # If no paragraphs created, use entire content as one paragraph
-            if not paragraphs_text:
-                paragraphs_text = [content]
-
-            # Calculate time per paragraph (distribute evenly)
-            total_duration = section['end_time'] - section['start_time']
-            if len(paragraphs_text) > 0:
-                time_per_paragraph = total_duration / len(paragraphs_text)
+            if not section_segments:
+                # Fallback: treat entire content as one paragraph if no segments
+                paragraphs = [{
+                    'text': section['content'],
+                    'start_time': section['start_time'],
+                    'end_time': section['end_time']
+                }]
             else:
-                time_per_paragraph = total_duration
+                # Use segments as paragraph units - they already represent coherent thoughts
+                # The LLM was instructed to create 1-3 sentence segments that complete ideas
+                total_duration = section['end_time'] - section['start_time']
+                time_per_segment = total_duration / len(section_segments) if section_segments else total_duration
 
-            paragraphs = []
-            for i, para_text in enumerate(paragraphs_text):
-                if para_text.strip():
-                    para_start = section['start_time'] + (i * time_per_paragraph)
-                    para_end = para_start + time_per_paragraph
+                paragraphs = []
+                for i, segment in enumerate(section_segments):
+                    para_start = section['start_time'] + (i * time_per_segment)
+                    para_end = para_start + time_per_segment
 
                     paragraphs.append({
-                        'text': para_text.strip(),
+                        'text': segment['text'].strip(),
                         'start_time': para_start,
                         'end_time': para_end
                     })
 
             section['paragraphs'] = paragraphs
-
-            # Calculate average sentences per paragraph for quality check
-            avg_sentences = len(sentences) / len(paragraphs) if paragraphs else 0
-            logger.debug(f"   Section '{section['title']}': {len(sentences)} sentences → {len(paragraphs)} paragraphs (avg {avg_sentences:.1f} sentences/paragraph)")
+            logger.debug(f"   Section '{section['title']}': {len(section_segments)} segments → {len(paragraphs)} paragraphs")
 
         # Generate formatted markdown content
         formatted_lines = []
